@@ -148,8 +148,8 @@ export default function SetupPage() {
 
           {/* Navigation */}
           <div className="flex items-center justify-between pt-4">
-            <Button variant="ghost" size="sm" asChild className="font-sans text-xs tracking-[0.1em] uppercase text-muted-foreground">
-              <Link href="/">← Back</Link>
+            <Button variant="ghost" size="sm" render={<Link href="/" />} nativeButton={false} className="font-sans text-xs tracking-[0.1em] uppercase text-muted-foreground">
+              ← Back
             </Button>
             <Button size="lg" className="font-sans text-sm tracking-[0.1em] uppercase px-8">
               Research Company →

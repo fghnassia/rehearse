@@ -244,7 +244,7 @@ export default function DesignSystem() {
 
         {/* Accordion */}
         <Section title="Accordion">
-          <Accordion type="single" collapsible className="w-full">
+          <Accordion multiple={false} className="w-full">
             <AccordionItem value="sample-answer">
               <AccordionTrigger className="font-sans text-sm font-medium">Sample stronger answer</AccordionTrigger>
               <AccordionContent className="font-sans text-sm text-muted-foreground leading-relaxed">

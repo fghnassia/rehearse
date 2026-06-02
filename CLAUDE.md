@@ -49,7 +49,7 @@ Single-session app. No authentication in V1. No persistent user accounts.
 
 ## 6. Current Status
 
-**Last completed:** Design system audit — all issues resolved. Component specs written for all 7 custom components.
+**Last completed:** Build plan written — `/docs/build-plan.md`.
 
 **What's built:**
 - `/` — Home screen
@@ -57,17 +57,16 @@ Single-session app. No authentication in V1. No persistent user accounts.
 - `/design-system` — Design system preview page
 - `/src/components/ui/` — All shadcn components installed: button, input, label, card, badge, progress, radio-group, separator, textarea, accordion, alert, skeleton, sonner
 
-**What's NOT built yet (build in this order):**
-1. `/docs/build-plan.md` — write this first before any code
-2. Custom components: PipelineIndicator, CoverageIndicator, PersonaCard, VoiceInput, LiveTranscript, ScoreDisplay, QuestionCard
-3. `/research` — Company Research screen
-4. `/simulation` — Interview Simulation screen
-5. `/report` — Feedback Report screen
-6. `/src/lib/api/` — All API integrations (Serper, Claude, session state)
-7. `/src/lib/config.ts` — Environment variable access layer
+**What's NOT built yet (see /docs/build-plan.md for full detail):**
+- Phase 1: `src/lib/config.ts`, `src/lib/session-types.ts`, `src/lib/session-context.tsx`
+- Phase 2: Custom components — PipelineIndicator, CoverageIndicator, PersonaCard, VoiceInput, LiveTranscript, ScoreDisplay, QuestionCard
+- Phase 3: `/research` screen + Serper API integration
+- Phase 4: `/simulation` screen + Claude question generation + evaluation
+- Phase 5: `/report` screen + report generation
+- Phase 6: Route guards + error states + polish
 
 **API keys needed (not yet configured):**
 - `ANTHROPIC_API_KEY` — Claude API
 - `SERPER_API_KEY` — Web search
 
-**Immediate next step:** Write `/docs/build-plan.md`
+**Immediate next step:** Phase 1 — Foundation (session state + config)

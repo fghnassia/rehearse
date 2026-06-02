@@ -43,8 +43,8 @@ export default function Home() {
 
           {/* CTA */}
           <div className="flex items-center gap-6">
-            <Button asChild size="lg" className="font-sans text-sm tracking-[0.1em] uppercase px-8">
-              <Link href="/setup">Start Session</Link>
+            <Button render={<Link href="/setup" />} nativeButton={false} size="lg" className="font-sans text-sm tracking-[0.1em] uppercase px-8">
+              Start Session
             </Button>
             <span className="text-xs text-muted-foreground">
               No account required
