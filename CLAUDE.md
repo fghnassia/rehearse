@@ -23,6 +23,7 @@ Single-session app. No authentication in V1. No persistent user accounts.
 - Styling: Tailwind only. No inline styles. No CSS modules.
 - Layout padding: px-8 for all page-level outer padding — never px-6 at the layout level
 - State: useState and useContext only. No Redux, no Zustand.
+- Add "use client" to any page or component that uses shadcn interactive components (RadioGroup, Accordion, Sonner, etc.), useState, useEffect, or event handlers
 - File naming: kebab-case for all non-component files
 - API routes: /src/app/api/, one route per file
 - Error handling: caught and handled in /src/lib/api/ — never swallowed silently, always surface to the UI with a clear message
@@ -43,4 +44,30 @@ Single-session app. No authentication in V1. No persistent user accounts.
 - Project context: See /ProjectBrief.md — product vision, target user, feature scope, design principles
 - Build plan: See /docs/build-plan.md — build phase by phase, do not jump ahead
 - Component library: See /docs/component-spec.md — typography roles, layout conventions, semantic tokens, and specs for all 7 custom components
+- UX docs: See /docs/journey-map.md, /docs/information-architecture.md, /docs/user-flow.md
 - Next.js version notes: See /AGENTS.md — read before writing any Next.js code
+
+## 6. Current Status
+
+**Last completed:** Design system audit — all issues resolved. Component specs written for all 7 custom components.
+
+**What's built:**
+- `/` — Home screen
+- `/setup` — Context Intake (Session Setup)
+- `/design-system` — Design system preview page
+- `/src/components/ui/` — All shadcn components installed: button, input, label, card, badge, progress, radio-group, separator, textarea, accordion, alert, skeleton, sonner
+
+**What's NOT built yet (build in this order):**
+1. `/docs/build-plan.md` — write this first before any code
+2. Custom components: PipelineIndicator, CoverageIndicator, PersonaCard, VoiceInput, LiveTranscript, ScoreDisplay, QuestionCard
+3. `/research` — Company Research screen
+4. `/simulation` — Interview Simulation screen
+5. `/report` — Feedback Report screen
+6. `/src/lib/api/` — All API integrations (Serper, Claude, session state)
+7. `/src/lib/config.ts` — Environment variable access layer
+
+**API keys needed (not yet configured):**
+- `ANTHROPIC_API_KEY` — Claude API
+- `SERPER_API_KEY` — Web search
+
+**Immediate next step:** Write `/docs/build-plan.md`
