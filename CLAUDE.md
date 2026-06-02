@@ -35,6 +35,8 @@ Single-session app. No authentication in V1. No persistent user accounts.
 - Do not make external API calls outside /src/lib/api/
 - Do not add gamification — no badges, streaks, leaderboards, or XP systems
 - Do not install a third-party speech library — use the Web Speech API
+- Do not display per-answer evaluation scores during simulation — evaluate silently, surface scores only in /report
+- Do not render /setup, /research, /simulation, or /report without valid session state — redirect to / if accessed directly
 
 ## 5. References
 - Project context: See /ProjectBrief.md — product vision, target user, feature scope, design principles

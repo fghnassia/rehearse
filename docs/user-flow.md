@@ -1,89 +1,183 @@
 # Rehearse — User Flow Diagram
+*Revised after IA evaluation — v2*
 
-**14 screens/states · 8 decision points · 4 system processes · 3 error recovery paths**
+**Changes from v1:** Simulation split into 3 sub-states · Mid-simulation exit defined · Scores hidden during simulation · Copy report action · Pre-simulation notice · Error states assigned to specific routes · Stage pipeline indicator corrected
 
 ---
 
 ```mermaid
 flowchart TD
-    A([START: Enter App]) --> B[Home Screen\nIntro + 'Start Session' CTA]
-    B --> C[/Click 'Start Session'/]
-    C --> D[Context Intake Screen\n4 required inputs]
+    START([▶ Enter App]) --> HOME
 
-    D --> E[/Upload Resume PDF/]
-    D --> F[/Enter Portfolio URL/]
-    D --> G[/Enter Job Posting URL/]
-    D --> H[/Select Interview Stage\nRecruiter · Hiring Manager · Portfolio Review/]
+    HOME["/ — Home
+    App name · Value prop · CTA"]
 
-    E & F & G & H --> I{All 4 fields\ncompleted?}
+    HOME --> |"Click 'Start Session'"| SETUP
 
-    I -- No --> J[Inline validation errors\nHighlight missing fields]
-    J --> D
+    SETUP["**/setup — Session Setup**
+    Pipeline: Setup → Research → Simulation → Report
+    Resume upload · Portfolio URL
+    Job posting URL · Stage selector
+    ⚠ Notice: session runs as one continuous flow"]
 
-    I -- Yes --> K[[SYSTEM: Parse resume\nScrape portfolio\nParse job posting]]
+    SETUP --> |"Upload resume"| RESUME_VALID{Resume\nvalid PDF?}
+    RESUME_VALID -- No --> RESUME_ERR["Error: Invalid file
+    Retry upload"]
+    RESUME_ERR --> SETUP
 
-    K --> L{Parsing\nresult?}
-    L -- PDF invalid --> M[Error: Invalid file\nPrompt retry]
-    M --> E
-    L -- Job URL unreachable --> N[Error: URL unreachable\nPrompt retry]
-    N --> G
-    L -- Portfolio unreachable --> O[Warning: Portfolio unavailable\nNote it and proceed]
-    O --> P
-    L -- All parsed --> P[[SYSTEM: Web search\nGlassdoor · Reddit · Blind\nLinkedIn · Company blog]]
+    SETUP --> |"Enter portfolio URL"| PORT_VALID{Portfolio\nreachable?}
+    PORT_VALID -- No --> PORT_WARN["⚠ Warning: Portfolio unavailable
+    Noted — proceed anyway"]
+    PORT_WARN --> SETUP_COMPLETE
+    PORT_VALID -- Yes --> SETUP_COMPLETE
 
-    P --> Q[Research Loading Screen\nProgress indicator with context]
-    Q --> R{Data coverage\nlevel?}
+    SETUP --> |"Enter job posting URL"| JOB_VALID{Job URL\nreachable?}
+    JOB_VALID -- No --> JOB_ERR["Error: URL unreachable
+    Retry or paste manually"]
+    JOB_ERR --> SETUP
+    JOB_VALID -- Yes --> SETUP_COMPLETE
 
-    R -- Rich --> S[Research Screen\n🟢 High coverage\nCompany-specific insights displayed]
-    R -- Sparse --> T[Research Screen\n🟡 Low coverage\nDisclaimer: questions will be\nless company-specific]
-    R -- None --> U[Research Screen\n🔴 No data found\nGeneric questions only\nUser explicitly informed]
+    RESUME_VALID -- Yes --> SETUP_COMPLETE
+    SETUP --> |"Select stage"| STAGE_SELECTED[/"Stage selected
+    Recruiter / HM / Portfolio"/]
+    STAGE_SELECTED --> SETUP_COMPLETE
 
-    S --> V[/Click 'Begin Simulation'/]
-    T --> V
-    U --> V
+    SETUP_COMPLETE{All 4 fields\ncompleted?}
+    SETUP_COMPLETE -- No --> SETUP_VALIDATION["Inline validation errors
+    Highlight missing fields"]
+    SETUP_VALIDATION --> SETUP
+    SETUP_COMPLETE -- "← Back" --> HOME
 
-    V --> W[[SYSTEM: Load stage persona\nGenerate question set\nfrom profile + job posting]]
-    W --> X[Simulation Screen\nPersona intro + first question]
+    SETUP_COMPLETE -- Yes --> |"Click 'Research Company'"| RESEARCH_PARSE
+    RESEARCH_PARSE[["SYSTEM: Parse resume
+    Scrape portfolio · Parse job posting"]]
+    RESEARCH_PARSE --> RESEARCH_A
 
-    X --> Y{Voice input\nsupported?}
-    Y -- Yes --> Z[Voice mode default\nMic active · text fallback shown]
-    Y -- No --> AA[Text-only mode\nMic unavailable notice shown]
+    subgraph RESEARCH ["/research — Company Research"]
+        RESEARCH_A["**State A: Researching**
+        Live status: 'Searching Glassdoor… Reddit… Blind…'
+        Sources shown as found — never silent spinner"]
 
-    Z --> AB[Persona asks Question N]
-    AA --> AB
+        RESEARCH_A --> RESEARCH_SEARCH[["SYSTEM: Web search
+        Glassdoor · Reddit · Blind · LinkedIn · Company blog"]]
 
-    AB --> AC{Input\nmethod}
-    AC -- Voice --> AD[/User speaks answer/]
-    AC -- Text --> AE[/User types answer/]
+        RESEARCH_SEARCH --> COVERAGE{Data\ncoverage?}
 
-    AD --> AF{Transcription\nsucceeded?}
-    AF -- Yes --> AG[Transcript displayed\nUser confirms or edits]
-    AF -- No --> AH[Transcription failed\nRetry prompt · or switch to text]
-    AH --> AC
-    AG --> AI[/Submit answer/]
-    AE --> AI
+        COVERAGE -- Rich --> RESEARCH_B_RICH["**State B: Company Brief**
+        🟢 High coverage · Sources listed
+        Company-specific insights displayed"]
 
-    AI --> AJ[[SYSTEM: Evaluate response\nClarity · Specificity · Relevance\nAI fluency · Overall impression]]
+        COVERAGE -- Sparse --> RESEARCH_B_SPARSE["**State B: Company Brief**
+        🟡 Low coverage · Disclaimer shown
+        'Questions will be less company-specific'"]
 
-    AJ --> AK{More\nquestions?}
-    AK -- Yes, next question --> AB
-    AK -- No, simulation complete --> AL[[SYSTEM: Generate\nfeedback report]]
+        COVERAGE -- None --> RESEARCH_B_NONE["**State B: Company Brief**
+        🔴 No data found · User explicitly informed
+        Generic questions only"]
+    end
 
-    AL --> AM[Feedback Report Screen\nPer-question scores\nStrengths · Gaps · Recommendations\nSample stronger answers]
+    RESEARCH_B_RICH --> |"← Change inputs"| SETUP
+    RESEARCH_B_SPARSE --> |"← Change inputs"| SETUP
+    RESEARCH_B_NONE --> |"← Change inputs"| SETUP
 
-    AM --> AN{Next action?}
-    AN -- Redo same stage --> V
-    AN -- Prep different stage --> D
-    AN -- Start over new company --> B
-    AN -- Done --> AO([END: Exit Session])
+    RESEARCH_B_RICH --> |"Click 'Begin Simulation'"| SIM_LOAD
+    RESEARCH_B_SPARSE --> |"Click 'Begin Simulation'"| SIM_LOAD
+    RESEARCH_B_NONE --> |"Click 'Begin Simulation'"| SIM_LOAD
+
+    SIM_LOAD[["SYSTEM: Load stage persona
+    Generate question set from profile + job posting + coverage data"]]
+    SIM_LOAD --> SIM_READY
+
+    subgraph SIMULATION ["/simulation — Interview Simulation"]
+
+        SIM_READY["**State A: Ready**
+        Persona name · Stage label · Brief
+        Question count · Input mode notice"]
+
+        SIM_READY --> |"Browser back/close"| ABANDONED
+        SIM_READY --> |"Click 'Begin Interview'"| VOICE_CHECK
+
+        VOICE_CHECK{Voice input\nsupported?}
+        VOICE_CHECK -- Yes --> SIM_VOICE["Voice mode active
+        Mic button shown · Text fallback available"]
+        VOICE_CHECK -- No --> SIM_TEXT_ONLY["Text-only mode
+        Mic unavailable notice shown"]
+
+        SIM_VOICE --> SIM_B
+        SIM_TEXT_ONLY --> SIM_B
+
+        SIM_B["**State B: In Progress**
+        Persona asks Question N · Progress: 'N of 7'
+        ⚑ Evaluation runs silently — scores hidden until /report"]
+
+        SIM_B --> |"Browser back/close"| ABANDONED
+        SIM_B --> INPUT_METHOD{Input\nmethod?}
+
+        INPUT_METHOD -- Voice --> SPEAK[/"User speaks answer"/]
+        INPUT_METHOD -- Text --> TYPE[/"User types answer"/]
+
+        SPEAK --> TRANSCRIBE{Transcription\nsucceeded?}
+        TRANSCRIBE -- Yes --> TRANSCRIPT["Transcript shown
+        One-pass edit · then confirm"]
+        TRANSCRIBE -- No --> TRANSCRIBE_ERR["Error: Transcription failed
+        Retry or switch to text"]
+        TRANSCRIBE_ERR --> INPUT_METHOD
+
+        TRANSCRIPT --> SUBMIT[/"Click 'Submit'"/]
+        TYPE --> SUBMIT
+
+        SUBMIT --> EVAL[["SYSTEM: Evaluate response
+        Clarity · Specificity · Relevance · AI fluency · Impression
+        ⚑ Scores stored — NOT displayed yet"]]
+
+        EVAL --> MORE_Q{More\nquestions?}
+        MORE_Q -- Yes --> SIM_B
+        MORE_Q -- No, all answered --> SIM_C
+
+        SIM_C["**State C: Complete**
+        'Session complete. Generating your report…'
+        Loading state with context"]
+
+        SIM_C --> REPORT_GEN
+    end
+
+    ABANDONED(["Session abandoned
+    → redirect to /"])
+    ABANDONED --> HOME
+
+    REPORT_GEN[["SYSTEM: Compile feedback report
+    Aggregate scores · Generate recommendations
+    Produce sample stronger answers"]]
+    REPORT_GEN --> REPORT
+
+    REPORT["**/report — Your Report**
+    Session summary: Company · Role · Stage
+    Overall impression + rating
+    ─────────────────────────────────
+    Per-question breakdown ×N:
+    Question → Answer → Scores
+    What worked · Gap + fix
+    Sample stronger answer (calibration, not script)
+    ─────────────────────────────────
+    ⚠ 'This report lives only in this session.'
+    📋 Copy report (plain text — no auth required)"]
+
+    REPORT --> EXIT_CHOICE{What\nnext?}
+    EXIT_CHOICE -- "Redo this stage" --> SIM_LOAD
+    EXIT_CHOICE -- "Prep a different stage" --> SETUP
+    EXIT_CHOICE -- "Start fresh" --> HOME
+    EXIT_CHOICE -- "Done" --> END(["◼ Session ends"])
 ```
 
 ---
 
-## Key Design Decisions Captured
+## Key Design Decisions in This Flow
 
-- **Portfolio failure is a warning, not a blocker** — app notes it and proceeds
-- **Transcription failure has a clear recovery path** — retry or switch to text, never a dead end
-- **Three post-report exits** — redo same stage, swap stage, fresh company — all must be visible on feedback screen
-- **Research loading shows context** — "Searching Glassdoor, Reddit..." not a blank spinner
-- **Data coverage is always disclosed** — three levels (rich / sparse / none), user never misled
+| Decision | Rationale |
+|---|---|
+| Per-answer scores hidden until /report | Prevents users performing for the score rather than practicing authentically |
+| State A (Ready) before simulation begins | Gives the user a moment to prepare — transition from "reading" to "in interview" |
+| ABANDONED node for mid-simulation browser exit | Makes the behavior explicit — session is gone, user returns home |
+| Copy report — no auth | Highest-friction post-session moment, near-zero implementation cost |
+| Pre-simulation notice on /setup | User commits knowing the session is one continuous flow |
+| Stage pipeline (not "Step 1 of 2") | Sets honest expectations for a high-anxiety user |
