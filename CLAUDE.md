@@ -21,6 +21,7 @@ Single-session app. No authentication in V1. No persistent user accounts.
 - API calls: /src/lib/api/ only — never inline in components or route handlers
 - Environment variables: accessed through /src/lib/config.ts only — never referenced directly in components or routes
 - Styling: Tailwind only. No inline styles. No CSS modules.
+- Layout padding: px-8 for all page-level outer padding — never px-6 at the layout level
 - State: useState and useContext only. No Redux, no Zustand.
 - File naming: kebab-case for all non-component files
 - API routes: /src/app/api/, one route per file
@@ -41,5 +42,5 @@ Single-session app. No authentication in V1. No persistent user accounts.
 ## 5. References
 - Project context: See /ProjectBrief.md — product vision, target user, feature scope, design principles
 - Build plan: See /docs/build-plan.md — build phase by phase, do not jump ahead
-- Component library: See /docs/component-spec.md — use existing components before creating new ones
+- Component library: See /docs/component-spec.md — typography roles, layout conventions, semantic tokens, and specs for all 7 custom components
 - Next.js version notes: See /AGENTS.md — read before writing any Next.js code
