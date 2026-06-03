@@ -138,23 +138,29 @@ export default function ConfirmPage() {
               </div>
             </div>
 
-            {/* Job posting quotes */}
-            {context.jobQuotes.length > 0 && (
+            {/* Job insights */}
+            {context.jobInsights.length > 0 && (
               <>
                 <Separator className="mb-10" />
-                <div className="flex flex-col gap-4 mb-10">
+                <div className="flex flex-col gap-6 mb-10">
                   <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">
-                    From the job posting
+                    What we found in the posting
                   </p>
-                  <ul className="flex flex-col gap-4">
-                    {context.jobQuotes.map((quote, i) => (
-                      <li key={i} className="border-l-2 border-border pl-4">
-                        <p className="font-sans text-sm text-muted-foreground leading-relaxed italic">
-                          "{quote}"
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
+                  {context.jobInsights.map((insight, i) => (
+                    <div key={i} className="flex flex-col gap-2">
+                      <p className="font-sans text-xs font-medium text-muted-foreground uppercase tracking-[0.1em]">
+                        {insight.category}
+                      </p>
+                      <ul className="flex flex-col gap-1.5">
+                        {insight.points.map((point, j) => (
+                          <li key={j} className="flex items-start gap-3">
+                            <span className="font-sans text-xs text-muted-foreground mt-1 shrink-0">—</span>
+                            <span className="font-sans text-sm text-foreground leading-relaxed">{point}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
               </>
             )}

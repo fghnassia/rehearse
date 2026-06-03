@@ -1,7 +1,9 @@
-import type { ContextData } from "../session-types"
+import type { ContextData, JobInsight } from "../session-types"
 
 // ---------------------------------------------------------------------------
-// Company logo — Clearbit (free, no key required)
+// Company logo
+// Uses Clearbit autocomplete to resolve company name → domain,
+// then builds a Google favicon URL (128px, always served, reliable).
 // ---------------------------------------------------------------------------
 
 export async function fetchCompanyLogo(companyName: string): Promise<string | undefined> {
@@ -12,8 +14,10 @@ export async function fetchCompanyLogo(companyName: string): Promise<string | un
     )
     if (!res.ok) return undefined
     const results = await res.json()
-    const match = results?.[0]
-    return match?.logo ?? undefined
+    const domain = results?.[0]?.domain as string | undefined
+    if (!domain) return undefined
+    // Google's favicon service — returns 128px image, always available
+    return `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`
   } catch {
     return undefined
   }
@@ -99,38 +103,83 @@ function extractRoleFromSnippets(snippets: SerperSearchResult[]): string {
   return ""
 }
 
-function extractJobQuotes(snippets: SerperSearchResult[]): string[] {
-  const quotes: string[] = []
-  const seen = new Set<string>()
+function extractJobInsights(snippets: SerperSearchResult[]): JobInsight[] {
+  const allText = snippets.map((s) => s.snippet).join(" ")
+  const sentences = allText
+    .split(/[.!?]\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 30 && s.length < 200)
 
-  // Keywords that signal meaningful job description content
-  const qualitySignals = [
-    /you.ll|you will|we.re looking|we are looking/i,
-    /experience|background|background/i,
-    /design|product|collaborate|lead|own|drive/i,
-    /responsible|work with|partner|shape/i,
+  const insights: JobInsight[] = []
+
+  // --- Key qualities ---
+  const qualityPatterns = [
+    /you.ll|you will|you bring|you have|you.re|we.re looking|we need|ideal candidate/i,
+    /\d+\+?\s*years?\s+(of\s+)?(experience|background)/i,
+    /experience (in|with|designing|leading|building)/i,
+    /strong (understanding|background|skills|experience)/i,
   ]
-
-  for (const result of snippets) {
-    // Split snippet into sentences
-    const sentences = result.snippet
-      .split(/[.!?]\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 40 && s.length < 220)
-
-    for (const sentence of sentences) {
-      if (quotes.length >= 3) break
-      const key = sentence.toLowerCase().slice(0, 60)
-      if (seen.has(key)) continue
-      if (qualitySignals.some((re) => re.test(sentence))) {
-        seen.add(key)
-        quotes.push(sentence.replace(/^["']+|["']+$/g, "").trim())
-      }
-    }
-    if (quotes.length >= 3) break
+  const qualityPoints = dedupe(
+    sentences.filter((s) => qualityPatterns.some((re) => re.test(s))).slice(0, 3)
+  )
+  if (qualityPoints.length > 0) {
+    insights.push({ category: "Key qualities", points: qualityPoints })
   }
 
-  return quotes
+  // --- Work location ---
+  const locationPatterns: Array<[RegExp, string]> = [
+    [/\bfully remote\b/i, "Fully remote"],
+    [/\bremote[\s-]first\b/i, "Remote-first"],
+    [/\bhybrid\b/i, "Hybrid"],
+    [/\bin[\s-]?office\b|\bon[\s-]?site\b|\bin[\s-]?person\b/i, "In-office"],
+    [/\bremote\b/i, "Remote"],
+  ]
+  for (const [re, label] of locationPatterns) {
+    if (re.test(allText)) {
+      // Find the sentence that mentions it
+      const ctx = sentences.find((s) => re.test(s))
+      insights.push({
+        category: "Location",
+        points: [ctx ? cleanInsightPoint(ctx) : label],
+      })
+      break
+    }
+  }
+
+  // --- Compensation ---
+  const salaryPatterns = [
+    /\$[\d,]+\s*[-–—]\s*\$[\d,]+/,
+    /\$[\d,.]+[kK]\s*[-–—]\s*\$[\d,.]+[kK]/,
+    /salary.{0,50}\$[\d,]+/i,
+    /compensation.{0,80}/i,
+    /equity|stock options|RSU/i,
+  ]
+  const salaryPoints = dedupe(
+    sentences
+      .filter((s) => salaryPatterns.some((re) => re.test(s)))
+      .slice(0, 2)
+  )
+  if (salaryPoints.length > 0) {
+    insights.push({ category: "Compensation", points: salaryPoints })
+  }
+
+  return insights
+}
+
+function cleanInsightPoint(text: string): string {
+  return text.replace(/^[-•·▪▸*"']+\s*/, "").replace(/\s{2,}/g, " ").trim()
+}
+
+function dedupe(arr: string[]): string[] {
+  const seen = new Set<string>()
+  return arr
+    .map(cleanInsightPoint)
+    .filter((s) => {
+      const key = s.toLowerCase().slice(0, 50)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -320,8 +369,8 @@ export async function parseContext(
   const roleFromSerper = serperResults.length > 0 ? extractRoleFromSnippets(serperResults) : ""
   const roleTitle = roleFromSerper || roleFromPage || "Product Designer"
 
-  // Step 4 — Job quotes from Serper snippets
-  const jobQuotes = extractJobQuotes(serperResults)
+  // Step 4 — Structured job insights from Serper snippets
+  const jobInsights = extractJobInsights(serperResults)
 
   // Step 5 — Resume bullets
   const resumeBullets = summariseResume(resumeText)
@@ -330,7 +379,7 @@ export async function parseContext(
     companyName,
     roleTitle,
     logoUrl: logoUrl ?? undefined,
-    jobQuotes,
+    jobInsights,
     resumeBullets,
   }
 }

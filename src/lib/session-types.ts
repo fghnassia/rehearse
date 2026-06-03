@@ -54,11 +54,16 @@ export interface ReportData {
   generatedAt: string
 }
 
+export interface JobInsight {
+  category: string
+  points: string[]
+}
+
 export interface ContextData {
   companyName: string
   roleTitle: string
   logoUrl?: string
-  jobQuotes: string[]
+  jobInsights: JobInsight[]
   resumeBullets: string[]
 }
 
