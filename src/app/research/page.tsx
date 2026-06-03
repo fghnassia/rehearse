@@ -50,7 +50,10 @@ export default function ResearchPage() {
     fetch("/api/research", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobPostingUrl: session.setup.jobPostingUrl }),
+      body: JSON.stringify({
+        jobPostingUrl: session.setup.jobPostingUrl,
+        companyName: session.context?.companyName,
+      }),
     })
       .then((r) => {
         if (!r.ok) return r.json().then((d) => Promise.reject(d.error ?? "Research failed"))

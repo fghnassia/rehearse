@@ -3,7 +3,7 @@ import { runResearch } from "@/lib/api/research"
 import { getConfigSafe } from "@/lib/config"
 
 export async function POST(req: NextRequest) {
-  const { jobPostingUrl } = await req.json()
+  const { jobPostingUrl, companyName } = await req.json()
 
   if (!jobPostingUrl) {
     return NextResponse.json({ error: "jobPostingUrl is required" }, { status: 400 })
@@ -12,9 +12,8 @@ export async function POST(req: NextRequest) {
   const { serperApiKey } = getConfigSafe()
 
   if (!serperApiKey) {
-    // Graceful degradation — return a "none" coverage result so the flow continues
     return NextResponse.json({
-      companyName: extractCompanyNameFallback(jobPostingUrl),
+      companyName: companyName || extractCompanyNameFallback(jobPostingUrl),
       roleTitle: "Product Designer",
       coverageLevel: "none",
       sourceCount: 0,
@@ -25,7 +24,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const data = await runResearch(jobPostingUrl, serperApiKey)
+    const data = await runResearch(jobPostingUrl, serperApiKey, companyName)
     return NextResponse.json(data)
   } catch (err) {
     console.error("[research]", err)

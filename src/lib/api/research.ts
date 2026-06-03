@@ -36,10 +36,11 @@ function extractCompanyName(jobPostingUrl: string): string {
 
 export async function runResearch(
   jobPostingUrl: string,
-  serperApiKey: string
+  serperApiKey: string,
+  companyName?: string
 ): Promise<ResearchData> {
-  const companyName = extractCompanyName(jobPostingUrl)
-  const results = await searchCompanyInterviews(companyName, serperApiKey)
+  const resolvedCompanyName = companyName || extractCompanyName(jobPostingUrl)
+  const results = await searchCompanyInterviews(resolvedCompanyName, serperApiKey)
   const coverageLevel = classifyCoverage(results)
 
   const disclaimer =
@@ -50,7 +51,7 @@ export async function runResearch(
       : undefined
 
   return {
-    companyName,
+    companyName: resolvedCompanyName,
     roleTitle: "Product Designer",
     coverageLevel,
     sourceCount: results.length,
