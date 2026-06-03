@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { SessionProvider } from "@/lib/session-context";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -32,7 +33,7 @@ export default function RootLayout({
       className={cn("h-full antialiased", cormorant.variable, dmSans.variable)}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        {children}
+        <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
   );
