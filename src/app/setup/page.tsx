@@ -45,7 +45,7 @@ export default function SetupPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [portfolioUrl, setPortfolioUrl] = useState("")
   const [jobPostingUrl, setJobPostingUrl] = useState("")
-  const [stage, setStage] = useState<InterviewStage>("hiring-manager")
+  const [stage, setStage] = useState<InterviewStage>("recruiter")
   const [errors, setErrors] = useState<FormErrors>({})
   const [isDragging, setIsDragging] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -272,6 +272,7 @@ export default function SetupPage() {
             </p>
             <RadioGroup
               value={stage}
+              defaultValue="recruiter"
               onValueChange={(v) => setStage(v as InterviewStage)}
               className="flex flex-col gap-2 mt-1"
             >

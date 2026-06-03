@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { PipelineIndicator } from "@/components/pipeline-indicator"
 import { useSession } from "@/lib/session-context"
@@ -24,6 +25,19 @@ export default function ConfirmPage() {
   const [context, setContext] = useState<ContextData | null>(null)
   const [errorMessage, setErrorMessage] = useState("")
   const hasFetched = useRef(false)
+
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteValue, setPasteValue] = useState("")
+  const [pasteSaved, setPasteSaved] = useState(false)
+
+  const handleSavePaste = () => {
+    if (!pasteValue.trim() || !context) return
+    const updated = { ...context, jobDescriptionOverride: pasteValue.trim() }
+    updateContext(updated)
+    setContext(updated)
+    setPasteSaved(true)
+    setPasteOpen(false)
+  }
 
   useEffect(() => {
     if (!session.setup) {
@@ -139,31 +153,84 @@ export default function ConfirmPage() {
             </div>
 
             {/* Job insights */}
-            {context.jobInsights.length > 0 && (
-              <>
-                <Separator className="mb-10" />
-                <div className="flex flex-col gap-6 mb-10">
-                  <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">
-                    What we found in the posting
+            <Separator className="mb-10" />
+            <div className="flex flex-col gap-6 mb-4">
+              <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">
+                What we found in the posting
+              </p>
+              {context.jobInsights.length > 0 ? (
+                context.jobInsights.map((insight, i) => (
+                  <div key={i} className="flex flex-col gap-2">
+                    <p className="font-sans text-xs font-medium text-muted-foreground uppercase tracking-[0.1em]">
+                      {insight.category}
+                    </p>
+                    <ul className="flex flex-col gap-1.5">
+                      {insight.points.map((point, j) => (
+                        <li key={j} className="flex items-start gap-3">
+                          <span className="font-sans text-xs text-muted-foreground mt-1 shrink-0">—</span>
+                          <span className="font-sans text-sm text-foreground leading-relaxed">{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              ) : (
+                <p className="font-sans text-sm text-muted-foreground leading-relaxed">
+                  We couldn't extract structured data from this posting.
+                </p>
+              )}
+            </div>
+
+            {/* Job description paste fallback */}
+            <div className="mb-10">
+              {pasteSaved ? (
+                <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                  ✓ Job description saved — we'll use it to tailor your questions.
+                </p>
+              ) : (
+                <>
+                  <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                    Not what you expected?{" "}
+                    <button
+                      onClick={() => setPasteOpen((v) => !v)}
+                      className="underline underline-offset-2 hover:text-foreground transition-colors"
+                    >
+                      Paste the job description as plain text
+                    </button>{" "}
+                    and we'll use that instead.
                   </p>
-                  {context.jobInsights.map((insight, i) => (
-                    <div key={i} className="flex flex-col gap-2">
-                      <p className="font-sans text-xs font-medium text-muted-foreground uppercase tracking-[0.1em]">
-                        {insight.category}
-                      </p>
-                      <ul className="flex flex-col gap-1.5">
-                        {insight.points.map((point, j) => (
-                          <li key={j} className="flex items-start gap-3">
-                            <span className="font-sans text-xs text-muted-foreground mt-1 shrink-0">—</span>
-                            <span className="font-sans text-sm text-foreground leading-relaxed">{point}</span>
-                          </li>
-                        ))}
-                      </ul>
+                  {pasteOpen && (
+                    <div className="mt-4 flex flex-col gap-3">
+                      <Textarea
+                        placeholder="Paste the full job description here…"
+                        value={pasteValue}
+                        onChange={(e) => setPasteValue(e.target.value)}
+                        className="font-sans text-sm min-h-[160px] resize-y"
+                        autoFocus
+                      />
+                      <div className="flex items-center gap-3">
+                        <Button
+                          size="sm"
+                          onClick={handleSavePaste}
+                          disabled={!pasteValue.trim()}
+                          className="font-sans text-xs tracking-[0.1em] uppercase"
+                        >
+                          Save description
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setPasteOpen(false); setPasteValue("") }}
+                          className="font-sans text-xs text-muted-foreground"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </>
-            )}
+                  )}
+                </>
+              )}
+            </div>
 
             <Separator className="mb-10" />
 

@@ -65,6 +65,7 @@ export interface ContextData {
   logoUrl?: string
   jobInsights: JobInsight[]
   resumeBullets: string[]
+  jobDescriptionOverride?: string   // user-pasted plain text; takes priority over URL scraping
 }
 
 export interface SessionState {
