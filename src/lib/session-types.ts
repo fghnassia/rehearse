@@ -57,6 +57,8 @@ export interface ReportData {
 export interface ContextData {
   companyName: string
   roleTitle: string
+  logoUrl?: string
+  jobQuotes: string[]
   resumeBullets: string[]
 }
 

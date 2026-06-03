@@ -106,12 +106,17 @@ export default function ConfirmPage() {
             {/* Company + Role */}
             <div className="flex flex-col gap-6 mb-10">
               <div className="flex flex-col gap-1">
-                <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">
+                <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground mb-2">
                   Company
                 </p>
-                <p className="font-sans text-lg font-medium text-foreground">
-                  {context.companyName}
-                </p>
+                <div className="flex items-center gap-3">
+                  {context.logoUrl && (
+                    <CompanyLogo src={context.logoUrl} name={context.companyName} />
+                  )}
+                  <p className="font-sans text-lg font-medium text-foreground">
+                    {context.companyName}
+                  </p>
+                </div>
               </div>
 
               <div className="flex flex-col gap-1">
@@ -132,6 +137,27 @@ export default function ConfirmPage() {
                 </p>
               </div>
             </div>
+
+            {/* Job posting quotes */}
+            {context.jobQuotes.length > 0 && (
+              <>
+                <Separator className="mb-10" />
+                <div className="flex flex-col gap-4 mb-10">
+                  <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">
+                    From the job posting
+                  </p>
+                  <ul className="flex flex-col gap-4">
+                    {context.jobQuotes.map((quote, i) => (
+                      <li key={i} className="border-l-2 border-border pl-4">
+                        <p className="font-sans text-sm text-muted-foreground leading-relaxed italic">
+                          "{quote}"
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
 
             <Separator className="mb-10" />
 
@@ -213,5 +239,19 @@ export default function ConfirmPage() {
         <p className="text-xs text-muted-foreground font-sans">Rehearse · Confirm context</p>
       </div>
     </main>
+  )
+}
+
+function CompanyLogo({ src, name }: { src: string; name: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={`${name} logo`}
+      className="w-8 h-8 rounded-md object-contain bg-white border border-border p-0.5"
+      onError={() => setFailed(true)}
+    />
   )
 }
