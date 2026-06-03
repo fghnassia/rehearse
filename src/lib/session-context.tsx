@@ -7,6 +7,7 @@ const SESSION_KEY = "rehearse-session"
 
 interface SessionContextValue {
   session: SessionState
+  hydrated: boolean
   updateSetup: (data: SetupData) => void
   updateContext: (data: ContextData) => void
   updateResearch: (data: ResearchData) => void
@@ -19,6 +20,7 @@ const SessionContext = createContext<SessionContextValue | null>(null)
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<SessionState>({})
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     try {
@@ -26,6 +28,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (stored) setSession(JSON.parse(stored))
     } catch {
       // sessionStorage unavailable or corrupt — start fresh
+    } finally {
+      setHydrated(true)
     }
   }, [])
 
@@ -83,7 +87,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [persist])
 
   return (
-    <SessionContext.Provider value={{ session, updateSetup, updateContext, updateResearch, updateSimulation, updateReport, clearSession }}>
+    <SessionContext.Provider value={{ session, hydrated, updateSetup, updateContext, updateResearch, updateSimulation, updateReport, clearSession }}>
       {children}
     </SessionContext.Provider>
   )

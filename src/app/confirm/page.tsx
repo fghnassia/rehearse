@@ -19,7 +19,7 @@ const stageLabels: Record<string, string> = {
 
 export default function ConfirmPage() {
   const router = useRouter()
-  const { session, updateContext } = useSession()
+  const { session, hydrated, updateContext } = useSession()
 
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading")
   const [context, setContext] = useState<ContextData | null>(null)
@@ -40,6 +40,7 @@ export default function ConfirmPage() {
   }
 
   useEffect(() => {
+    if (!hydrated) return
     if (!session.setup) {
       router.replace("/")
       return
@@ -68,7 +69,7 @@ export default function ConfirmPage() {
         setErrorMessage(typeof msg === "string" ? msg : "Something went wrong.")
         setPhase("error")
       })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stageLabel = session.setup ? stageLabels[session.setup.stage] ?? session.setup.stage : ""
 

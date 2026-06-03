@@ -22,7 +22,7 @@ const statusMessages = [
 
 export default function ResearchPage() {
   const router = useRouter()
-  const { session, updateResearch } = useSession()
+  const { session, hydrated, updateResearch } = useSession()
 
   const [phase, setPhase] = useState<"searching" | "results" | "error">("searching")
   const [statusIndex, setStatusIndex] = useState(0)
@@ -32,6 +32,7 @@ export default function ResearchPage() {
   const hasFetched = useRef(false)
 
   useEffect(() => {
+    if (!hydrated) return
     // Redirect if arrived without setup data
     if (!session.setup || !session.context) {
       router.replace("/")
@@ -72,7 +73,7 @@ export default function ResearchPage() {
       })
 
     return () => clearInterval(interval)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
