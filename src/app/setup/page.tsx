@@ -107,8 +107,8 @@ export default function SetupPage() {
 
       updateSetup({
         resumeText: data.text,
-        portfolioUrl,
-        jobPostingUrl,
+        portfolioUrl: portfolioUrl ? normalizeUrl(portfolioUrl) : "",
+        jobPostingUrl: normalizeUrl(jobPostingUrl),
         stage,
       })
 
@@ -343,9 +343,17 @@ export default function SetupPage() {
   )
 }
 
+function normalizeUrl(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return trimmed
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return `https://${trimmed}`
+}
+
 function isValidUrl(value: string): boolean {
+  if (!value.trim()) return false
   try {
-    const url = new URL(value)
+    const url = new URL(normalizeUrl(value))
     return url.protocol === "http:" || url.protocol === "https:"
   } catch {
     return false
