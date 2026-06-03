@@ -33,7 +33,7 @@ export default function ResearchPage() {
 
   useEffect(() => {
     // Redirect if arrived without setup data
-    if (!session.setup) {
+    if (!session.setup || !session.context) {
       router.replace("/")
       return
     }

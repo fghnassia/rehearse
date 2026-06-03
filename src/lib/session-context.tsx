@@ -1,13 +1,14 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
-import type { SessionState, SetupData, ResearchData, SimulationData, ReportData } from "./session-types"
+import type { SessionState, SetupData, ContextData, ResearchData, SimulationData, ReportData } from "./session-types"
 
 const SESSION_KEY = "rehearse-session"
 
 interface SessionContextValue {
   session: SessionState
   updateSetup: (data: SetupData) => void
+  updateContext: (data: ContextData) => void
   updateResearch: (data: ResearchData) => void
   updateSimulation: (data: SimulationData) => void
   updateReport: (data: ReportData) => void
@@ -45,6 +46,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
+  const updateContext = useCallback((data: ContextData) => {
+    setSession(prev => {
+      const next = { ...prev, context: data }
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
+
   const updateResearch = useCallback((data: ResearchData) => {
     setSession(prev => {
       const next = { ...prev, research: data }
@@ -74,7 +83,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [persist])
 
   return (
-    <SessionContext.Provider value={{ session, updateSetup, updateResearch, updateSimulation, updateReport, clearSession }}>
+    <SessionContext.Provider value={{ session, updateSetup, updateContext, updateResearch, updateSimulation, updateReport, clearSession }}>
       {children}
     </SessionContext.Provider>
   )

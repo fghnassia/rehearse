@@ -112,7 +112,7 @@ export default function SetupPage() {
         stage,
       })
 
-      router.push("/research")
+      router.push("/confirm")
     } catch {
       setErrors({ submit: "Something went wrong. Please try again." })
       setIsSubmitting(false)
@@ -328,7 +328,7 @@ export default function SetupPage() {
               onClick={handleSubmit}
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Reading resume…" : "Research Company →"}
+              {isSubmitting ? "Reading resume…" : "Start Research →"}
             </Button>
           </div>
 

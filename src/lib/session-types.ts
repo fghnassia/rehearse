@@ -54,8 +54,15 @@ export interface ReportData {
   generatedAt: string
 }
 
+export interface ContextData {
+  companyName: string
+  roleTitle: string
+  resumeBullets: string[]
+}
+
 export interface SessionState {
   setup?: SetupData
+  context?: ContextData
   research?: ResearchData
   simulation?: SimulationData
   report?: ReportData
