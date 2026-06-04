@@ -28,12 +28,38 @@ export default function SimulationPage() {
   const [micPermission, setMicPermission] = useState<"unknown" | "granted" | "denied">("unknown")
   const hasFetched = useRef(false)
 
-  const requestMicPermission = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      stream.getTracks().forEach(t => t.stop()) // immediately release — just needed the permission
+  const requestMicPermission = () => {
+    // Use SpeechRecognition directly — getUserMedia permission is separate and
+    // doesn't always carry over to the Web Speech API in all browsers.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
+    if (!SR) {
+      setMicPermission("denied")
+      setInputMode("text")
+      return
+    }
+    const probe = new SR()
+    probe.maxAlternatives = 1
+    probe.onstart = () => {
+      probe.stop()
       setMicPermission("granted")
-    } catch {
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    probe.onerror = (e: any) => {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        setMicPermission("denied")
+        setInputMode("text")
+      } else {
+        // Any other error (no-speech, network, etc.) means permission was granted
+        setMicPermission("granted")
+      }
+    }
+    probe.onend = () => {
+      // If onstart already fired it's granted; if not, treat as granted
+      // (browser ended without error = permission OK, just no audio captured)
+      setMicPermission(prev => prev === "unknown" ? "granted" : prev)
+    }
+    try { probe.start() } catch {
       setMicPermission("denied")
       setInputMode("text")
     }

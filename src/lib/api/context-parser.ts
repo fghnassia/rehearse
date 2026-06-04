@@ -247,12 +247,17 @@ function isGatedUrl(url: string): boolean {
 
 function extractDomainCompany(url: string): string {
   try {
-    const parts = new URL(url).hostname.replace("www.", "").split(".")
+    const u = new URL(url)
+    const parts = u.hostname.replace("www.", "").split(".")
     const jobBoards = ["greenhouse", "lever", "ashby", "workday", "icims", "taleo", "bamboohr", "workable", "smartrecruiters"]
     const candidate = parts[parts.length - 2] ?? ""
     if (jobBoards.includes(candidate.toLowerCase())) {
-      const forParam = new URL(url).searchParams.get("for")
+      // 1. Try "for" query param (some boards use ?for=company)
+      const forParam = u.searchParams.get("for")
       if (forParam) return titleCase(forParam)
+      // 2. Try first path segment — Greenhouse: /vercel/jobs/123, Lever: /vercel/12345
+      const pathSlug = u.pathname.split("/").filter(Boolean)[0]
+      if (pathSlug && pathSlug !== "jobs" && pathSlug !== "embed") return titleCase(pathSlug)
     }
     return titleCase(candidate)
   } catch { return "the company" }
