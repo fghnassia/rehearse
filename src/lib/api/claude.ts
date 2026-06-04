@@ -56,7 +56,13 @@ export async function generateQuestions(
     : `No specific interview data was found for ${context.companyName}. Generate well-crafted general questions appropriate for this role.`
 
   const stageInstructions: Record<InterviewStage, string> = {
-    recruiter: "Generate 5 recruiter screen questions covering: motivation for this role, relevant background, logistics/availability, compensation expectations, and one culture-fit question. Keep questions conversational and direct.",
+    recruiter: `Generate 5 recruiter screen questions in this exact order:
+1. A warm open-ended opener — "Tell me about yourself and your background as a designer" or "Walk me through what you're currently working on."
+2. A follow-up on their recent experience — what they're doing now, what kind of work, team size.
+3. Why this company and this role specifically — what drew them to it.
+4. Logistics — availability, timeline, location/remote preferences.
+5. Compensation expectations or one soft culture-fit question.
+Keep the tone conversational, not interrogative. These should feel like a real recruiter call, not an exam.`,
     "hiring-manager": "Generate 5 hiring manager questions covering: design process and decision-making, a specific project challenge with AI relevance, cross-functional collaboration, how they'd approach a key challenge at this company, and their point of view on AI in product design. Questions should be substantive and push for specifics.",
     "portfolio-review": "Generate 5 portfolio review questions covering: a specific project walkthrough prompt, a decision they'd make differently, how they handled a stakeholder conflict or constraint, how AI shaped their design process in a recent project, and what impact their work had. Questions should prompt deep reflection.",
   }

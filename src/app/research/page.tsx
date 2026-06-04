@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { PipelineIndicator } from "@/components/pipeline-indicator"
 import { CoverageIndicator } from "@/components/coverage-indicator"
 import { useSession } from "@/lib/session-context"
-import type { ResearchData } from "@/lib/session-types"
+import type { ResearchData, ResearchSource } from "@/lib/session-types"
 
 const statusMessages = [
   "Searching Glassdoor…",
@@ -145,32 +145,8 @@ export default function ResearchPage() {
               </Alert>
             )}
 
-            {research.insights && (
-              <div className="mb-8">
-                <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground mb-4">
-                  What we found
-                </p>
-                <div className="flex flex-col gap-4">
-                  {research.sources.slice(0, 5).map((source, i) => (
-                    <div key={i} className="flex flex-col gap-1">
-                      <a
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-sans text-sm font-medium text-foreground hover:underline"
-                      >
-                        {source.title}
-                      </a>
-                      <p className="font-sans text-xs text-muted-foreground leading-relaxed">
-                        {source.snippet}
-                      </p>
-                      <p className="font-sans text-xs text-muted-foreground/60">
-                        {source.source}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {research.sources.length > 0 && (
+              <SourcesSummary sources={research.sources} />
             )}
 
             <Separator className="mb-8" />
@@ -239,3 +215,64 @@ export default function ResearchPage() {
     </main>
   )
 }
+
+function SourcesSummary({ sources }: { sources: ResearchSource[] }) {
+  const [open, setOpen] = useState(false)
+
+  // Dedupe domains for favicon strip
+  const domains = [...new Set(
+    sources.map(s => { try { return new URL(s.url).hostname.replace("www.", "") } catch { return null } })
+      .filter(Boolean)
+  )].slice(0, 6) as string[]
+
+  return (
+    <div className="mb-8">
+      <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground mb-4">
+        Sources
+      </p>
+
+      {/* Compact summary row */}
+      <div className="flex items-center gap-3 mb-3">
+        <span className="font-sans text-sm text-foreground font-medium">{sources.length} source{sources.length !== 1 ? "s" : ""}</span>
+        <div className="flex items-center gap-1.5">
+          {domains.map((domain) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={domain}
+              src={`https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=32`}
+              alt={domain}
+              title={domain}
+              className="w-4 h-4 rounded-sm opacity-70"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
+            />
+          ))}
+        </div>
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="font-sans text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+        >
+          {open ? "Hide" : "See titles"}
+        </button>
+      </div>
+
+      {/* Expandable title list — no external links */}
+      {open && (
+        <ul className="flex flex-col gap-2 border-l-2 border-border pl-4">
+          {sources.map((source, i) => (
+            <li key={i} className="flex items-start gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${source.url}&size=32`}
+                alt=""
+                className="w-3.5 h-3.5 rounded-sm mt-0.5 shrink-0 opacity-60"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
+              />
+              <span className="font-sans text-sm text-foreground leading-snug">{source.title}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+

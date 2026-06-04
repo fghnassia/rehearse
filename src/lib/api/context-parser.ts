@@ -1,9 +1,37 @@
+import { generateObject } from "ai"
+import { createAnthropic } from "@ai-sdk/anthropic"
+import { z } from "zod"
 import type { ContextData, JobInsight } from "../session-types"
 
 // ---------------------------------------------------------------------------
-// Company logo
-// Uses Clearbit autocomplete to resolve company name → domain,
-// then builds a Google favicon URL (128px, always served, reliable).
+// Portfolio OG image
+// ---------------------------------------------------------------------------
+
+export async function fetchOgImage(url: string): Promise<string | undefined> {
+  if (!url) return undefined
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Rehearse/1.0)" },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return undefined
+    const html = await res.text()
+    const m =
+      html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+    const raw = m?.[1]?.trim()
+    if (!raw) return undefined
+    // Make relative URLs absolute
+    if (raw.startsWith("//")) return `https:${raw}`
+    if (raw.startsWith("/")) return `${new URL(url).origin}${raw}`
+    return raw
+  } catch {
+    return undefined
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Company logo (Clearbit domain → Google favicon)
 // ---------------------------------------------------------------------------
 
 export async function fetchCompanyLogo(companyName: string): Promise<string | undefined> {
@@ -16,7 +44,6 @@ export async function fetchCompanyLogo(companyName: string): Promise<string | un
     const results = await res.json()
     const domain = results?.[0]?.domain as string | undefined
     if (!domain) return undefined
-    // Google's favicon service — returns 128px image, always available
     return `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`
   } catch {
     return undefined
@@ -24,10 +51,10 @@ export async function fetchCompanyLogo(companyName: string): Promise<string | un
 }
 
 // ---------------------------------------------------------------------------
-// Job content — Serper search (used when direct fetch fails, e.g. LinkedIn)
+// Serper job search
 // ---------------------------------------------------------------------------
 
-interface SerperSearchResult {
+interface SerperResult {
   title: string
   snippet: string
   link: string
@@ -37,22 +64,18 @@ async function searchJobContent(
   companyName: string,
   jobUrl: string,
   serperApiKey: string
-): Promise<SerperSearchResult[]> {
-  // Two queries: one targeting the specific URL, one for the job role
+): Promise<SerperResult[]> {
   const queries = [
-    `site:linkedin.com "${companyName}" product designer job`,
     `"${companyName}" "product designer" job description responsibilities`,
+    `site:linkedin.com "${companyName}" product designer job`,
   ]
-
-  // If there's a LinkedIn job ID in the URL, add it as a targeted query
   try {
     const u = new URL(jobUrl)
     const jobId = u.searchParams.get("currentJobId")
     if (jobId) queries.unshift(`linkedin.com/jobs/view/${jobId}`)
   } catch {}
 
-  const results: SerperSearchResult[] = []
-
+  const results: SerperResult[] = []
   for (const q of queries.slice(0, 2)) {
     try {
       const res = await fetch("https://google.serper.dev/search", {
@@ -63,135 +86,98 @@ async function searchJobContent(
       })
       if (!res.ok) continue
       const data = await res.json()
-      const organic: SerperSearchResult[] = data?.organic ?? []
-      results.push(...organic)
-      if (results.length >= 3) break
-    } catch {
-      continue
-    }
+      results.push(...(data?.organic ?? []))
+      if (results.length >= 5) break
+    } catch { continue }
   }
-
   return results
 }
 
-function extractRoleFromSnippets(snippets: SerperSearchResult[]): string {
+// ---------------------------------------------------------------------------
+// Claude-powered analysis
+// ---------------------------------------------------------------------------
+
+const insightsSchema = z.object({
+  insights: z.array(z.object({
+    category: z.string(),
+    points: z.array(z.string()),
+  })),
+})
+
+async function analyzeJobWithClaude(
+  jobText: string,
+  companyName: string,
+  roleTitle: string,
+  anthropicApiKey: string
+): Promise<JobInsight[]> {
+  const client = createAnthropic({ apiKey: anthropicApiKey })
+  const { object } = await generateObject({
+    model: client("claude-sonnet-4-5"),
+    schema: insightsSchema,
+    prompt: `Analyze this job posting content for a ${roleTitle} role at ${companyName}.
+
+Job content:
+${jobText.slice(0, 3000)}
+
+Extract up to 4 structured insight categories. Only include categories where you found real information — skip categories with no data. Use these categories when applicable:
+- "Key qualities" — specific skills, traits, or experience they're looking for
+- "Location" — remote, hybrid, in-office, or specific city
+- "Compensation" — salary range, equity, or benefits if mentioned
+- "About the role" — 1-2 sentences summarizing what this person will actually do
+
+Each category should have 1-3 concise bullet points. Be specific and direct — no generic filler.`,
+  })
+  return object.insights
+}
+
+const resumeSchema = z.object({
+  bullets: z.array(z.string()).min(2).max(5),
+})
+
+async function summarizeResumeWithClaude(
+  resumeText: string,
+  anthropicApiKey: string
+): Promise<string[]> {
+  const client = createAnthropic({ apiKey: anthropicApiKey })
+  const { object } = await generateObject({
+    model: client("claude-sonnet-4-5"),
+    schema: resumeSchema,
+    prompt: `Read this resume and extract 3-4 concise bullet points that capture who this person is as a designer.
+
+Resume:
+${resumeText.slice(0, 3000)}
+
+Write bullets that cover: their current or most recent role, years of experience, notable companies or projects, and any AI/design system/product expertise. Each bullet should be one short sentence. Be specific — use their actual job titles and company names, not generic descriptions.`,
+  })
+  return object.bullets
+}
+
+// ---------------------------------------------------------------------------
+// Role extraction from Serper results
+// ---------------------------------------------------------------------------
+
+function extractRoleFromSnippets(snippets: SerperResult[]): string {
   const roleTitles = [
-    "Principal Product Designer",
-    "Staff Product Designer",
-    "Senior Product Designer",
-    "Lead Product Designer",
-    "Product Design Manager",
-    "Head of Product Design",
-    "Product Designer",
-    "Senior Designer",
-    "UX Designer",
-    "UI Designer",
+    "Principal Product Designer", "Staff Product Designer", "Senior Product Designer",
+    "Lead Product Designer", "Product Design Manager", "Head of Product Design",
+    "Product Designer", "Senior Designer", "UX Designer",
   ]
-
   const allText = snippets.map((s) => `${s.title} ${s.snippet}`).join(" ")
-
   for (const title of roleTitles) {
     if (allText.toLowerCase().includes(title.toLowerCase())) return title
   }
-
-  // Try to extract from titles like "Senior Product Designer at Vercel"
   for (const s of snippets) {
     const m = s.title.match(/^(.+?)\s+(?:at|@)\s+.+$/i)
     if (m) return m[1].trim()
   }
-
   return ""
 }
 
-function extractJobInsights(snippets: SerperSearchResult[]): JobInsight[] {
-  const allText = snippets.map((s) => s.snippet).join(" ")
-  const sentences = allText
-    .split(/[.!?]\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 30 && s.length < 200)
-
-  const insights: JobInsight[] = []
-
-  // --- Key qualities ---
-  const qualityPatterns = [
-    /you.ll|you will|you bring|you have|you.re|we.re looking|we need|ideal candidate/i,
-    /\d+\+?\s*years?\s+(of\s+)?(experience|background)/i,
-    /experience (in|with|designing|leading|building)/i,
-    /strong (understanding|background|skills|experience)/i,
-  ]
-  const qualityPoints = dedupe(
-    sentences.filter((s) => qualityPatterns.some((re) => re.test(s))).slice(0, 3)
-  )
-  if (qualityPoints.length > 0) {
-    insights.push({ category: "Key qualities", points: qualityPoints })
-  }
-
-  // --- Work location ---
-  const locationPatterns: Array<[RegExp, string]> = [
-    [/\bfully remote\b/i, "Fully remote"],
-    [/\bremote[\s-]first\b/i, "Remote-first"],
-    [/\bhybrid\b/i, "Hybrid"],
-    [/\bin[\s-]?office\b|\bon[\s-]?site\b|\bin[\s-]?person\b/i, "In-office"],
-    [/\bremote\b/i, "Remote"],
-  ]
-  for (const [re, label] of locationPatterns) {
-    if (re.test(allText)) {
-      // Find the sentence that mentions it
-      const ctx = sentences.find((s) => re.test(s))
-      insights.push({
-        category: "Location",
-        points: [ctx ? cleanInsightPoint(ctx) : label],
-      })
-      break
-    }
-  }
-
-  // --- Compensation ---
-  const salaryPatterns = [
-    /\$[\d,]+\s*[-–—]\s*\$[\d,]+/,
-    /\$[\d,.]+[kK]\s*[-–—]\s*\$[\d,.]+[kK]/,
-    /salary.{0,50}\$[\d,]+/i,
-    /compensation.{0,80}/i,
-    /equity|stock options|RSU/i,
-  ]
-  const salaryPoints = dedupe(
-    sentences
-      .filter((s) => salaryPatterns.some((re) => re.test(s)))
-      .slice(0, 2)
-  )
-  if (salaryPoints.length > 0) {
-    insights.push({ category: "Compensation", points: salaryPoints })
-  }
-
-  return insights
-}
-
-function cleanInsightPoint(text: string): string {
-  return text.replace(/^[-•·▪▸*"']+\s*/, "").replace(/\s{2,}/g, " ").trim()
-}
-
-function dedupe(arr: string[]): string[] {
-  const seen = new Set<string>()
-  return arr
-    .map(cleanInsightPoint)
-    .filter((s) => {
-      const key = s.toLowerCase().slice(0, 50)
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-}
-
 // ---------------------------------------------------------------------------
-// Direct page fetch (works for Greenhouse, Lever, direct company sites)
+// Direct page fetch
 // ---------------------------------------------------------------------------
 
-interface JobPageResult {
-  companyName: string
-  roleTitle: string
-}
-
-async function fetchJobPage(jobUrl: string): Promise<JobPageResult | null> {
+async function fetchJobPage(jobUrl: string): Promise<{ companyName: string; roleTitle: string } | null> {
   try {
     const res = await fetch(jobUrl, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; Rehearse/1.0)" },
@@ -199,59 +185,69 @@ async function fetchJobPage(jobUrl: string): Promise<JobPageResult | null> {
     })
     if (!res.ok) return null
     const html = await res.text()
-
-    const og = extractOgTags(html)
-    if (og.company && og.role) return { companyName: og.company, roleTitle: og.role }
-
-    const fromTitle = extractFromTitle(html)
-    if (fromTitle.role) {
-      return {
-        companyName: fromTitle.company || extractDomainCompany(jobUrl),
-        roleTitle: fromTitle.role,
-      }
-    }
+    const og = extractOgTitle(html)
+    if (og.roleTitle) return og
+    const title = extractPageTitle(html)
+    if (title.roleTitle) return title
   } catch {}
   return null
 }
 
-function extractOgTags(html: string): { company: string; role: string } {
-  const get = (prop: string) => {
-    const m =
-      html.match(new RegExp(`<meta[^>]+property=["']og:${prop}["'][^>]+content=["']([^"']+)["']`, "i")) ??
-      html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:${prop}["']`, "i"))
-    return m?.[1]?.trim() ?? ""
-  }
-  return parseRoleAtCompany(get("title"))
+function extractOgTitle(html: string) {
+  const m =
+    html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ??
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)
+  return parseRoleAtCompany(m?.[1]?.trim() ?? "")
 }
 
-function extractFromTitle(html: string): { company: string; role: string } {
+function extractPageTitle(html: string) {
   const m = html.match(/<title[^>]*>([^<]+)<\/title>/i)
   return parseRoleAtCompany(m?.[1]?.trim() ?? "")
 }
 
-function parseRoleAtCompany(text: string): { company: string; role: string } {
-  if (!text) return { company: "", role: "" }
+function parseRoleAtCompany(text: string): { companyName: string; roleTitle: string } {
+  if (!text) return { companyName: "", roleTitle: "" }
   const cleaned = text
     .replace(/\s*\|\s*(LinkedIn|Greenhouse|Lever|Ashby|Workday|Indeed|Glassdoor|Apply)\s*$/i, "")
     .trim()
-
   const atMatch = cleaned.match(/^(.+?)\s+(?:at|@|-)\s+(.+)$/i)
-  if (atMatch) return { role: atMatch[1].trim(), company: atMatch[2].trim() }
-
+  if (atMatch) return { roleTitle: atMatch[1].trim(), companyName: atMatch[2].trim() }
   const pipeMatch = cleaned.match(/^([^|]+)\s*[|–—]\s*(.+)$/)
   if (pipeMatch) {
-    const a = pipeMatch[1].trim()
-    const b = pipeMatch[2].trim()
-    return a.length <= b.length ? { company: a, role: b } : { company: b, role: a }
+    const a = pipeMatch[1].trim(), b = pipeMatch[2].trim()
+    return a.length <= b.length ? { companyName: a, roleTitle: b } : { companyName: b, roleTitle: a }
   }
+  return { companyName: "", roleTitle: cleaned }
+}
 
-  return { company: "", role: cleaned }
+// ---------------------------------------------------------------------------
+// Company name helpers
+// ---------------------------------------------------------------------------
+
+function getLinkedInCompanyName(url: string): string | null {
+  try {
+    const u = new URL(url)
+    if (!u.hostname.includes("linkedin.com")) return null
+    const kw = u.searchParams.get("keywords")
+    if (kw) return kw.trim()
+    const slug = u.pathname.split("/").filter(Boolean).pop() ?? ""
+    const atIdx = slug.lastIndexOf("-at-")
+    if (atIdx !== -1)
+      return titleCase(slug.slice(atIdx + 4).replace(/-\d+$/, "").replace(/-/g, " "))
+    return null
+  } catch { return null }
+}
+
+function isGatedUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname
+    return ["linkedin.com", "glassdoor.com", "indeed.com", "blind.com"].some((h) => host.includes(h))
+  } catch { return false }
 }
 
 function extractDomainCompany(url: string): string {
   try {
-    const hostname = new URL(url).hostname.replace("www.", "")
-    const parts = hostname.split(".")
+    const parts = new URL(url).hostname.replace("www.", "").split(".")
     const jobBoards = ["greenhouse", "lever", "ashby", "workday", "icims", "taleo", "bamboohr", "workable", "smartrecruiters"]
     const candidate = parts[parts.length - 2] ?? ""
     if (jobBoards.includes(candidate.toLowerCase())) {
@@ -259,82 +255,35 @@ function extractDomainCompany(url: string): string {
       if (forParam) return titleCase(forParam)
     }
     return titleCase(candidate)
-  } catch {
-    return "the company"
-  }
-}
-
-// ---------------------------------------------------------------------------
-// LinkedIn URL helpers
-// ---------------------------------------------------------------------------
-
-function getLinkedInCompanyName(url: string): string | null {
-  try {
-    const u = new URL(url)
-    if (!u.hostname.includes("linkedin.com")) return null
-    const keywords = u.searchParams.get("keywords")
-    if (keywords) return keywords.trim()
-    // /jobs/view/[id]/[slug]
-    const slug = u.pathname.split("/").filter(Boolean).pop() ?? ""
-    const atIdx = slug.lastIndexOf("-at-")
-    if (atIdx !== -1) {
-      return titleCase(slug.slice(atIdx + 4).replace(/-\d+$/, "").replace(/-/g, " "))
-    }
-    return null
-  } catch {
-    return null
-  }
-}
-
-function isGatedUrl(url: string): boolean {
-  try {
-    const host = new URL(url).hostname
-    return ["linkedin.com", "glassdoor.com", "indeed.com", "blind.com"].some((h) => host.includes(h))
-  } catch {
-    return false
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Resume summarising
-// ---------------------------------------------------------------------------
-
-export function summariseResume(resumeText: string): string[] {
-  const lines = resumeText
-    .split(/\n+/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 10 && l.length < 200)
-
-  const bullets: string[] = []
-
-  const presentLine = lines.find((l) => /present|current/i.test(l) && /\d{4}/.test(l))
-  if (presentLine) bullets.push(cleanBullet(presentLine))
-
-  const titlePatterns = /designer|researcher|director|lead|manager|engineer|strategist|consultant|founder|head of/i
-  const titleLine = lines.find((l) => titlePatterns.test(l) && l.split(" ").length <= 8)
-  if (titleLine && !bullets.includes(cleanBullet(titleLine))) bullets.push(cleanBullet(titleLine))
-
-  const yearsLine = lines.find((l) => /\d+[\+]?\s*years?\s+(of\s+)?experience/i.test(l))
-  if (yearsLine) bullets.push(cleanBullet(yearsLine))
-
-  const aiLine = lines.find((l) => /\bai\b|machine learning|llm|generative|figma|design system/i.test(l))
-  if (aiLine && bullets.length < 4) bullets.push(cleanBullet(aiLine))
-
-  for (const line of lines) {
-    if (bullets.length >= 4) break
-    const cleaned = cleanBullet(line)
-    if (!bullets.includes(cleaned) && line.split(" ").length >= 4) bullets.push(cleaned)
-  }
-
-  return bullets.slice(0, 4)
-}
-
-function cleanBullet(text: string): string {
-  return text.replace(/^[-•·▪▸*]\s*/, "").replace(/\s{2,}/g, " ").trim()
+  } catch { return "the company" }
 }
 
 function titleCase(str: string): string {
   return str.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+}
+
+// ---------------------------------------------------------------------------
+// Fallback heuristic insights (when no Claude key)
+// ---------------------------------------------------------------------------
+
+function heuristicInsights(snippets: SerperResult[]): JobInsight[] {
+  const allText = snippets.map((s) => s.snippet).join(" ")
+  const insights: JobInsight[] = []
+
+  const qualitySentences = allText.split(/[.!?]\s+/).filter(s =>
+    s.length > 30 && /you.ll|you have|we.re looking|experience|strong/i.test(s)
+  ).slice(0, 2).map(s => s.trim())
+  if (qualitySentences.length) insights.push({ category: "Key qualities", points: qualitySentences })
+
+  const locationPatterns: [RegExp, string][] = [
+    [/fully remote/i, "Fully remote"], [/remote.first/i, "Remote-first"],
+    [/hybrid/i, "Hybrid"], [/in.office|on.site/i, "In-office"],
+  ]
+  for (const [re, label] of locationPatterns) {
+    if (re.test(allText)) { insights.push({ category: "Location", points: [label] }); break }
+  }
+
+  return insights
 }
 
 // ---------------------------------------------------------------------------
@@ -344,42 +293,61 @@ function titleCase(str: string): string {
 export async function parseContext(
   resumeText: string,
   jobPostingUrl: string,
-  serperApiKey?: string | null
+  portfolioUrl?: string | null,
+  serperApiKey?: string | null,
+  anthropicApiKey?: string | null
 ): Promise<ContextData> {
-  // Step 1 — Get company name from URL
   const linkedInCompany = getLinkedInCompanyName(jobPostingUrl)
   const gated = isGatedUrl(jobPostingUrl)
 
-  // Step 2 — Run in parallel: direct page fetch + logo lookup + Serper job search
-  const [pageResult, logoUrl, serperResults] = await Promise.all([
+  // Run parallel fetches
+  const [pageResult, logoUrl, portfolioOgImage, serperResults] = await Promise.all([
     gated ? Promise.resolve(null) : fetchJobPage(jobPostingUrl),
     fetchCompanyLogo(linkedInCompany ?? extractDomainCompany(jobPostingUrl)),
-    serperApiKey && (gated || true)
+    portfolioUrl ? fetchOgImage(portfolioUrl) : Promise.resolve(undefined),
+    serperApiKey && gated
       ? searchJobContent(linkedInCompany ?? extractDomainCompany(jobPostingUrl), jobPostingUrl, serperApiKey)
       : Promise.resolve([]),
   ])
 
-  // Step 3 — Determine company name and role title
-  const companyName =
-    pageResult?.companyName ||
-    linkedInCompany ||
-    extractDomainCompany(jobPostingUrl)
-
+  const companyName = pageResult?.companyName || linkedInCompany || extractDomainCompany(jobPostingUrl)
   const roleFromPage = pageResult?.roleTitle ?? ""
   const roleFromSerper = serperResults.length > 0 ? extractRoleFromSnippets(serperResults) : ""
   const roleTitle = roleFromSerper || roleFromPage || "Product Designer"
 
-  // Step 4 — Structured job insights from Serper snippets
-  const jobInsights = extractJobInsights(serperResults)
+  // Build job text for Claude (Serper snippets + any pasted override used downstream)
+  const jobText = serperResults.map(r => `${r.title}\n${r.snippet}`).join("\n\n")
 
-  // Step 5 — Resume bullets
-  const resumeBullets = summariseResume(resumeText)
+  // Claude-powered analysis (when key available), else heuristic fallback
+  const [jobInsights, resumeBullets] = await Promise.all([
+    anthropicApiKey && jobText
+      ? analyzeJobWithClaude(jobText, companyName, roleTitle, anthropicApiKey).catch(() => heuristicInsights(serperResults))
+      : Promise.resolve(heuristicInsights(serperResults)),
+    anthropicApiKey
+      ? summarizeResumeWithClaude(resumeText, anthropicApiKey).catch(() => heuristicBullets(resumeText))
+      : Promise.resolve(heuristicBullets(resumeText)),
+  ])
 
-  return {
-    companyName,
-    roleTitle,
-    logoUrl: logoUrl ?? undefined,
-    jobInsights,
-    resumeBullets,
+  return { companyName, roleTitle, logoUrl, portfolioOgImage, jobInsights, resumeBullets }
+}
+
+function heuristicBullets(resumeText: string): string[] {
+  const lines = resumeText.split(/\n+/).map(l => l.trim()).filter(l => l.length > 10 && l.length < 200)
+  const bullets: string[] = []
+  const presentLine = lines.find(l => /present|current/i.test(l) && /\d{4}/.test(l))
+  if (presentLine) bullets.push(clean(presentLine))
+  const titleLine = lines.find(l => /designer|researcher|director|lead|manager/i.test(l) && l.split(" ").length <= 8)
+  if (titleLine && !bullets.includes(clean(titleLine))) bullets.push(clean(titleLine))
+  const yearsLine = lines.find(l => /\d+[\+]?\s*years?\s+(of\s+)?experience/i.test(l))
+  if (yearsLine) bullets.push(clean(yearsLine))
+  for (const line of lines) {
+    if (bullets.length >= 4) break
+    const c = clean(line)
+    if (!bullets.includes(c) && line.split(" ").length >= 4) bullets.push(c)
   }
+  return bullets.slice(0, 4)
+}
+
+function clean(text: string): string {
+  return text.replace(/^[-•·▪▸*]\s*/, "").replace(/\s{2,}/g, " ").trim()
 }

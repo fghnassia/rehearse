@@ -25,7 +25,19 @@ export default function SimulationPage() {
   const [textAnswer, setTextAnswer] = useState("")
   const [voiceConfirmed, setVoiceConfirmed] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState("")
+  const [micPermission, setMicPermission] = useState<"unknown" | "granted" | "denied">("unknown")
   const hasFetched = useRef(false)
+
+  const requestMicPermission = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach(t => t.stop()) // immediately release — just needed the permission
+      setMicPermission("granted")
+    } catch {
+      setMicPermission("denied")
+      setInputMode("text")
+    }
+  }
 
   // Guard + fetch questions
   useEffect(() => {
@@ -189,6 +201,33 @@ export default function SimulationPage() {
               questionCount={simulation.questions.length}
               onBegin={() => setPhase("interview")}
             />
+
+            {/* Mic permission — ask before interview starts */}
+            {micPermission === "unknown" && (
+              <div className="mt-10 pt-8 border-t border-border flex flex-col gap-3">
+                <p className="font-sans text-sm text-foreground font-medium">Allow microphone access</p>
+                <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                  This interview uses voice input. Allow access now so you won't be interrupted mid-answer.
+                </p>
+                <div className="flex items-center gap-3 mt-1">
+                  <Button size="sm" onClick={requestMicPermission} className="font-sans text-xs tracking-[0.1em] uppercase">
+                    Allow microphone
+                  </Button>
+                  <button
+                    onClick={() => { setMicPermission("denied"); setInputMode("text") }}
+                    className="font-sans text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+                  >
+                    Use text instead
+                  </button>
+                </div>
+              </div>
+            )}
+            {micPermission === "granted" && (
+              <p className="font-sans text-xs text-muted-foreground mt-6">✓ Microphone ready</p>
+            )}
+            {micPermission === "denied" && (
+              <p className="font-sans text-xs text-muted-foreground mt-6">Text input mode — microphone not available</p>
+            )}
           </>
         )}
 

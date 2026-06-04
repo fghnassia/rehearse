@@ -54,6 +54,7 @@ export default function ConfirmPage() {
       body: JSON.stringify({
         resumeText: session.setup.resumeText,
         jobPostingUrl: session.setup.jobPostingUrl,
+        portfolioUrl: session.setup.portfolioUrl || null,
       }),
     })
       .then((r) => {
@@ -117,6 +118,22 @@ export default function ConfirmPage() {
               Here's what<br />
               <em>I understood</em>
             </h1>
+
+            {/* Portfolio OG image */}
+            {context.portfolioOgImage && (
+              <div className="mb-8 -mx-0">
+                <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground mb-3">
+                  Portfolio
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={context.portfolioOgImage}
+                  alt="Portfolio preview"
+                  className="w-full rounded-lg border border-border object-cover max-h-48"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
+                />
+              </div>
+            )}
 
             {/* Company + Role */}
             <div className="flex flex-col gap-6 mb-10">
@@ -270,7 +287,7 @@ export default function ConfirmPage() {
                 className="font-sans text-sm tracking-[0.1em] uppercase px-8"
                 onClick={() => router.push("/research")}
               >
-                Looks right — start research →
+                Looks right — continue →
               </Button>
             </div>
           </>

@@ -63,6 +63,7 @@ export interface ContextData {
   companyName: string
   roleTitle: string
   logoUrl?: string
+  portfolioOgImage?: string
   jobInsights: JobInsight[]
   resumeBullets: string[]
   jobDescriptionOverride?: string   // user-pasted plain text; takes priority over URL scraping
