@@ -18,3 +18,9 @@ export function getConfigSafe() {
     serperApiKey: process.env.SERPER_API_KEY ?? null,
   }
 }
+
+export function getGroqApiKey(): string {
+  const key = process.env.GROQ_API_KEY
+  if (!key) throw new Error('GROQ_API_KEY is not set. Add it to .env.local.')
+  return key
+}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { LiveTranscript } from "./live-transcript"
 
@@ -15,79 +15,65 @@ interface VoiceInputProps {
 export function VoiceInput({ onTranscriptConfirmed, onSwitchToText, disabled }: VoiceInputProps) {
   const [state, setState] = useState<VoiceState>("idle")
   const [transcript, setTranscript] = useState("")
-  const [interimTranscript, setInterimTranscript] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
 
-  // Check availability on mount
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any
-    const SpeechRecognition = w.SpeechRecognition ?? w.webkitSpeechRecognition
+  const startRecording = useCallback(async () => {
+    setTranscript("")
+    setErrorMessage("")
 
-    if (!SpeechRecognition) {
-      setState("unavailable")
-      onSwitchToText()
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      setErrorMessage("Microphone access was denied. Allow mic access in your browser settings, or switch to text.")
+      setState("error")
       return
     }
 
-    const recognition = new SpeechRecognition()
-    recognition.continuous = false
-    recognition.interimResults = true
-    recognition.lang = "en-US"
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : MediaRecorder.isTypeSupported("audio/webm")
+      ? "audio/webm"
+      : ""
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognition.onresult = (e: any) => {
-      let interim = ""
-      let final = ""
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const text = e.results[i][0].transcript
-        if (e.results[i].isFinal) {
-          final += text
-        } else {
-          interim += text
-        }
-      }
-      if (final) setTranscript((prev) => (prev + " " + final).trim())
-      setInterimTranscript(interim)
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+    chunksRef.current = []
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data)
     }
 
-    recognition.onend = () => {
-      setInterimTranscript("")
-      setState((prev) => (prev === "recording" ? "transcript-ready" : prev))
-    }
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop())
+      setState("processing")
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognition.onerror = (e: any) => {
-      if (e.error === "no-speech") {
+      const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" })
+      const formData = new FormData()
+      formData.append("audio", blob)
+
+      try {
+        const res = await fetch("/api/transcribe", { method: "POST", body: formData })
+        const data = await res.json()
+        if (!res.ok || !data.transcript) throw new Error(data.error ?? "Transcription failed")
+        setTranscript(data.transcript.trim())
         setState("transcript-ready")
-        return
+      } catch (err) {
+        setErrorMessage(err instanceof Error ? err.message : "Transcription failed. Try again.")
+        setState("error")
       }
-      setErrorMessage(
-        e.error === "not-allowed"
-          ? "Microphone access was denied. Allow mic access in your browser settings, or switch to text."
-          : "Recording failed. Try again or switch to text input."
-      )
-      setState("error")
     }
 
-    recognitionRef.current = recognition
-  }, [onSwitchToText])
-
-  const startRecording = useCallback(() => {
-    if (!recognitionRef.current) return
-    setTranscript("")
-    setInterimTranscript("")
-    setErrorMessage("")
+    recorder.start()
+    mediaRecorderRef.current = recorder
     setState("recording")
-    recognitionRef.current.start()
   }, [])
 
   const stopRecording = useCallback(() => {
-    recognitionRef.current?.stop()
-    setState("processing")
+    mediaRecorderRef.current?.stop()
+    mediaRecorderRef.current = null
   }, [])
 
   const confirmTranscript = useCallback(() => {
@@ -101,25 +87,11 @@ export function VoiceInput({ onTranscriptConfirmed, onSwitchToText, disabled }: 
     setState("idle")
   }, [])
 
-  // Unavailable — render nothing (caller shows text input)
-  if (state === "unavailable") return null
-
-  const transcriptState =
-    state === "recording" ? "streaming"
-    : state === "processing" ? "streaming"
-    : state === "transcript-ready" || state === "confirmed" ? (state === "confirmed" ? "locked" : "editable")
-    : "empty"
-
   return (
     <div className="flex flex-col gap-4" aria-label="Voice answer input">
-      {/* Status + mic button */}
       <div className="flex items-center gap-4">
         <button
-          aria-label={
-            state === "recording" ? "Stop recording" :
-            state === "processing" ? "Processing…" :
-            "Start recording"
-          }
+          aria-label={state === "recording" ? "Stop recording" : state === "processing" ? "Processing…" : "Start recording"}
           disabled={disabled || state === "processing" || state === "confirmed"}
           onClick={state === "recording" ? stopRecording : startRecording}
           className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
@@ -132,6 +104,8 @@ export function VoiceInput({ onTranscriptConfirmed, onSwitchToText, disabled }: 
         >
           {state === "recording" ? (
             <span className="w-3 h-3 bg-destructive rounded-sm" />
+          ) : state === "processing" ? (
+            <span className="w-3 h-3 rounded-full border-2 border-muted-foreground border-t-transparent animate-spin" />
           ) : (
             <MicIcon />
           )}
@@ -140,24 +114,20 @@ export function VoiceInput({ onTranscriptConfirmed, onSwitchToText, disabled }: 
           )}
         </button>
 
-        <p
-          className="font-sans text-sm text-muted-foreground"
-          aria-live="polite"
-        >
+        <p className="font-sans text-sm text-muted-foreground" aria-live="polite">
           {state === "idle" && "Click the mic to start recording"}
-          {state === "recording" && "Recording… click to stop"}
-          {state === "processing" && "Processing…"}
+          {state === "recording" && "Recording — click to stop when you're done"}
+          {state === "processing" && "Transcribing…"}
           {state === "transcript-ready" && "Review your answer — edit if needed"}
           {state === "confirmed" && "Answer confirmed"}
         </p>
       </div>
 
-      {/* Transcript */}
-      {(state === "recording" || state === "processing" || state === "transcript-ready" || state === "confirmed") && (
+      {(state === "transcript-ready" || state === "confirmed") && (
         <LiveTranscript
           transcript={transcript}
-          interimTranscript={interimTranscript}
-          state={transcriptState as "streaming" | "editable" | "locked" | "empty"}
+          interimTranscript=""
+          state={state === "confirmed" ? "locked" : "editable"}
           onChange={state === "transcript-ready" ? setTranscript : undefined}
         />
       )}
@@ -172,18 +142,12 @@ export function VoiceInput({ onTranscriptConfirmed, onSwitchToText, disabled }: 
           >
             Confirm answer
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={reRecord}
-            className="font-sans text-xs text-muted-foreground"
-          >
+          <Button variant="ghost" size="sm" onClick={reRecord} className="font-sans text-xs text-muted-foreground">
             Re-record
           </Button>
         </div>
       )}
 
-      {/* Error */}
       {state === "error" && (
         <div role="alert" className="flex flex-col gap-2">
           <p className="font-sans text-xs text-destructive">{errorMessage}</p>
@@ -198,7 +162,6 @@ export function VoiceInput({ onTranscriptConfirmed, onSwitchToText, disabled }: 
         </div>
       )}
 
-      {/* Switch to text */}
       {(state === "idle" || state === "transcript-ready") && (
         <button
           onClick={onSwitchToText}
