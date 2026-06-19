@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const data = await parseContext(resumeText, jobPostingUrl, portfolioUrl, serperApiKey, anthropicApiKey)
+    console.log("[parse-context] jobInsights:", JSON.stringify(data.jobInsights))
+    console.log("[parse-context] roleTitle:", data.roleTitle)
     return NextResponse.json(data)
   } catch (err) {
     console.error("[parse-context]", err)

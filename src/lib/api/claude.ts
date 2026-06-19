@@ -13,9 +13,15 @@ function getClient(apiKey: string) {
 // Stage-specific persona definitions
 // ---------------------------------------------------------------------------
 
+const recruiterNames = ["Alex", "Jordan", "Sam", "Taylor", "Casey", "Morgan", "Riley", "Drew", "Quinn", "Avery"]
+
+function randomRecruiterName(): string {
+  return recruiterNames[Math.floor(Math.random() * recruiterNames.length)]
+}
+
 const stagePersonas: Record<InterviewStage, { name: string; role: string; behaviorNote: string }> = {
   recruiter: {
-    name: "Alex",
+    name: randomRecruiterName(),
     role: "Talent Acquisition Partner",
     behaviorNote: "Asks direct, conversational questions. Focuses on communication clarity, motivation, and logistics. Expects concise and confident answers.",
   },

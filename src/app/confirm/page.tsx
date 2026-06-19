@@ -79,12 +79,9 @@ export default function ConfirmPage() {
       <div className="w-full h-px bg-foreground/10" />
 
       <div className="flex items-center justify-between px-8 py-5">
-        <Link
-          href="/"
-          className="text-xs font-sans font-medium tracking-[0.2em] uppercase text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ← Rehearse
-        </Link>
+        <span className="text-xs font-sans font-medium tracking-[0.2em] uppercase text-muted-foreground">
+          Rehearse
+        </span>
         <PipelineIndicator currentStage="setup" />
       </div>
 
@@ -172,24 +169,19 @@ export default function ConfirmPage() {
 
             {/* Job insights */}
             <Separator className="mb-10" />
-            <div className="flex flex-col gap-6 mb-4">
+            <div className="flex flex-col gap-5 mb-4">
               <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">
-                What we found in the posting
+                About the role
               </p>
               {context.jobInsights.length > 0 ? (
                 context.jobInsights.map((insight, i) => (
-                  <div key={i} className="flex flex-col gap-2">
-                    <p className="font-sans text-xs font-medium text-muted-foreground uppercase tracking-[0.1em]">
+                  <div key={i} className="flex items-start gap-4">
+                    <p className="font-sans text-xs font-medium text-muted-foreground uppercase tracking-[0.1em] w-28 shrink-0 pt-0.5">
                       {insight.category}
                     </p>
-                    <ul className="flex flex-col gap-1.5">
-                      {insight.points.map((point, j) => (
-                        <li key={j} className="flex items-start gap-3">
-                          <span className="font-sans text-xs text-muted-foreground mt-1 shrink-0">—</span>
-                          <span className="font-sans text-sm text-foreground leading-relaxed">{point}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <p className="font-sans text-sm text-foreground leading-relaxed">
+                      {insight.points[0]}
+                    </p>
                   </div>
                 ))
               ) : (
@@ -252,21 +244,25 @@ export default function ConfirmPage() {
 
             <Separator className="mb-10" />
 
-            {/* Resume summary */}
-            <div className="flex flex-col gap-4 mb-10">
+            {/* Resume profile */}
+            <div className="flex flex-col gap-5 mb-4">
               <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">
                 Your profile
               </p>
-              <ul className="flex flex-col gap-3">
-                {context.resumeBullets.map((bullet, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="font-sans text-xs text-muted-foreground mt-1 shrink-0">—</span>
-                    <span className="font-sans text-sm text-foreground leading-relaxed">{bullet}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="font-sans text-xs text-muted-foreground mt-1 leading-relaxed">
-                Not quite right? Go back and check your resume PDF — we read it as plain text.
+              <div className="flex items-start gap-4">
+                <p className="font-sans text-xs font-medium text-muted-foreground uppercase tracking-[0.1em] w-28 shrink-0 pt-0.5">Title</p>
+                <p className="font-sans text-sm text-foreground leading-relaxed">{context.resumeProfile.title}</p>
+              </div>
+              <div className="flex items-start gap-4">
+                <p className="font-sans text-xs font-medium text-muted-foreground uppercase tracking-[0.1em] w-28 shrink-0 pt-0.5">Experience</p>
+                <p className="font-sans text-sm text-foreground leading-relaxed">{context.resumeProfile.experience}</p>
+              </div>
+              <div className="flex items-start gap-4">
+                <p className="font-sans text-xs font-medium text-muted-foreground uppercase tracking-[0.1em] w-28 shrink-0 pt-0.5">Highlight</p>
+                <p className="font-sans text-sm text-foreground leading-relaxed">{context.resumeProfile.highlight}</p>
+              </div>
+              <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                Not quite right? Go back and check your resume PDF.
               </p>
             </div>
 
@@ -280,7 +276,7 @@ export default function ConfirmPage() {
                 nativeButton={false}
                 className="font-sans text-xs tracking-[0.1em] uppercase text-muted-foreground"
               >
-                ← Change inputs
+                ←
               </Button>
               <Button
                 size="lg"
@@ -317,7 +313,7 @@ export default function ConfirmPage() {
                 render={<Link href="/setup" />}
                 nativeButton={false}
               >
-                ← Change inputs
+                ←
               </Button>
             </div>
           </>

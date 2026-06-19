@@ -179,12 +179,9 @@ export default function SimulationPage() {
       <div className="w-full h-px bg-foreground/10" />
 
       <div className="flex items-center justify-between px-8 py-5">
-        <Link
-          href="/"
-          className="text-xs font-sans font-medium tracking-[0.2em] uppercase text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ← Rehearse
-        </Link>
+        <span className="text-xs font-sans font-medium tracking-[0.2em] uppercase text-muted-foreground">
+          Rehearse
+        </span>
         {phase !== "interview" && phase !== "evaluating" && (
           <PipelineIndicator currentStage="simulation" />
         )}
@@ -365,7 +362,7 @@ export default function SimulationPage() {
                 render={<Link href="/research" />}
                 nativeButton={false}
               >
-                ← Back to research
+                ←
               </Button>
             </div>
           </>

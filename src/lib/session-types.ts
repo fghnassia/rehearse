@@ -4,6 +4,7 @@ export type ScoreLevel = 'strong' | 'moderate' | 'weak'
 
 export interface SetupData {
   resumeText: string
+  resumeFileName?: string
   portfolioUrl: string
   jobPostingUrl: string
   stage: InterviewStage
@@ -14,6 +15,7 @@ export interface ResearchSource {
   url: string
   snippet: string
   source?: string
+  userAdded?: boolean
 }
 
 export interface ResearchData {
@@ -59,14 +61,20 @@ export interface JobInsight {
   points: string[]
 }
 
+export interface ResumeProfile {
+  title: string        // current/most recent role + company
+  experience: string   // years of experience + seniority level
+  highlight: string    // quantified impact if present, otherwise key skills/domains
+}
+
 export interface ContextData {
   companyName: string
   roleTitle: string
   logoUrl?: string
   portfolioOgImage?: string
   jobInsights: JobInsight[]
-  resumeBullets: string[]
-  jobDescriptionOverride?: string   // user-pasted plain text; takes priority over URL scraping
+  resumeProfile: ResumeProfile
+  jobDescriptionOverride?: string
 }
 
 export interface SessionState {

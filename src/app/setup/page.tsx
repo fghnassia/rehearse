@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { PipelineIndicator } from "@/components/pipeline-indicator"
+import { WarningCircle } from "@phosphor-icons/react"
 import { useSession } from "@/lib/session-context"
 import type { InterviewStage } from "@/lib/session-types"
 
@@ -40,9 +41,11 @@ interface FormErrors {
 
 export default function SetupPage() {
   const router = useRouter()
-  const { updateSetup } = useSession()
+  const { session, hydrated, updateSetup } = useSession()
 
   const [resumeFile, setResumeFile] = useState<File | null>(null)
+  const [existingResumeText, setExistingResumeText] = useState<string | null>(null)
+  const [existingResumeFileName, setExistingResumeFileName] = useState<string | null>(null)
   const [portfolioUrl, setPortfolioUrl] = useState("")
   const [jobPostingUrl, setJobPostingUrl] = useState("")
   const [stage, setStage] = useState<InterviewStage>("recruiter")
@@ -51,6 +54,16 @@ export default function SetupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Hydrate form from session when returning to this page
+  useEffect(() => {
+    if (!hydrated || !session.setup) return
+    setExistingResumeText(session.setup.resumeText)
+    setExistingResumeFileName(session.setup.resumeFileName ?? null)
+    setPortfolioUrl(session.setup.portfolioUrl ?? "")
+    setJobPostingUrl(session.setup.jobPostingUrl ?? "")
+    setStage(session.setup.stage ?? "recruiter")
+  }, [hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileSelect = useCallback((file: File) => {
     if (file.type !== "application/pdf") {
@@ -75,9 +88,11 @@ export default function SetupPage() {
     [handleFileSelect]
   )
 
+  const hasResume = !!resumeFile || !!existingResumeText
+
   const validate = (): boolean => {
     const next: FormErrors = {}
-    if (!resumeFile) next.resume = "Please upload your resume."
+    if (!hasResume) next.resume = "Please upload your resume."
     if (portfolioUrl && !isValidUrl(portfolioUrl)) next.portfolioUrl = "Enter a valid URL (e.g. https://yourname.com)"
     if (!jobPostingUrl) {
       next.jobPostingUrl = "Please enter the job posting URL."
@@ -89,24 +104,29 @@ export default function SetupPage() {
   }
 
   const handleSubmit = async () => {
-    if (!validate() || !resumeFile) return
+    if (!validate()) return
     setIsSubmitting(true)
 
     try {
-      // Parse PDF
-      const formData = new FormData()
-      formData.append("file", resumeFile)
-      const res = await fetch("/api/parse-pdf", { method: "POST", body: formData })
-      const data = await res.json()
+      let resumeText = existingResumeText ?? ""
 
-      if (!res.ok) {
-        setErrors({ submit: data.error ?? "Failed to read your resume. Try a different PDF." })
-        setIsSubmitting(false)
-        return
+      // Only re-parse if a new file was selected
+      if (resumeFile) {
+        const formData = new FormData()
+        formData.append("file", resumeFile)
+        const res = await fetch("/api/parse-pdf", { method: "POST", body: formData })
+        const data = await res.json()
+        if (!res.ok) {
+          setErrors({ submit: data.error ?? "Failed to read your resume. Try a different PDF." })
+          setIsSubmitting(false)
+          return
+        }
+        resumeText = data.text
       }
 
       updateSetup({
-        resumeText: data.text,
+        resumeText,
+        resumeFileName: resumeFile?.name ?? session.setup?.resumeFileName,
         portfolioUrl: portfolioUrl ? normalizeUrl(portfolioUrl) : "",
         jobPostingUrl: normalizeUrl(jobPostingUrl),
         stage,
@@ -125,12 +145,9 @@ export default function SetupPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between px-8 py-5">
-        <Link
-          href="/"
-          className="text-xs font-sans font-medium tracking-[0.2em] uppercase text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ← Rehearse
-        </Link>
+        <span className="text-xs font-sans font-medium tracking-[0.2em] uppercase text-muted-foreground">
+          Rehearse
+        </span>
         <PipelineIndicator currentStage="setup" />
       </div>
 
@@ -184,21 +201,22 @@ export default function SetupPage() {
               <CardContent className="flex flex-col items-start gap-2 py-8 px-6">
                 {resumeFile ? (
                   <>
-                    <p className="font-sans text-sm font-medium text-foreground">
-                      {resumeFile.name}
-                    </p>
+                    <p className="font-sans text-sm font-medium text-foreground">{resumeFile.name}</p>
                     <p className="font-sans text-xs text-muted-foreground">
                       {(resumeFile.size / 1024).toFixed(0)} KB · Click to replace
                     </p>
                   </>
-                ) : (
+                ) : existingResumeText ? (
                   <>
                     <p className="font-sans text-sm font-medium text-foreground">
-                      Upload PDF
+                      {existingResumeFileName ?? "Resume loaded"}
                     </p>
-                    <p className="font-sans text-xs text-muted-foreground">
-                      Drag and drop or click to browse
-                    </p>
+                    <p className="font-sans text-xs text-muted-foreground">Click to replace</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-sans text-sm font-medium text-foreground">Upload PDF</p>
+                    <p className="font-sans text-xs text-muted-foreground">Drag and drop or click to browse</p>
                     <Button
                       variant="outline"
                       size="sm"
@@ -254,9 +272,16 @@ export default function SetupPage() {
               }}
               className={`font-sans text-sm ${errors.jobPostingUrl ? "border-destructive" : ""}`}
             />
-            <p className="font-sans text-xs text-muted-foreground leading-relaxed">
-              The full URL of the role you're applying for. We'll parse the job description directly.
-            </p>
+            {isGatedJobBoard(jobPostingUrl) ? (
+              <p className="font-sans text-xs text-amber-700 leading-relaxed flex items-start gap-1.5">
+                <WarningCircle size={14} weight="fill" className="shrink-0 mt-0.5" />
+                {gatedBoardName(jobPostingUrl)}'s links are gated — paste the link from the company's career page instead.
+              </p>
+            ) : (
+              <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                The full URL of the role you're applying for. We'll parse the job description directly.
+              </p>
+            )}
             {errors.jobPostingUrl && (
               <p className="font-sans text-xs text-destructive">{errors.jobPostingUrl}</p>
             )}
@@ -342,6 +367,31 @@ export default function SetupPage() {
       </div>
     </main>
   )
+}
+
+const GATED_BOARDS: Record<string, string> = {
+  "linkedin.com": "LinkedIn",
+  "indeed.com": "Indeed",
+  "glassdoor.com": "Glassdoor",
+  "blind.com": "Blind",
+  "myworkdayjobs.com": "Workday",
+  "workday.com": "Workday",
+  "ziprecruiter.com": "ZipRecruiter",
+}
+
+function isGatedJobBoard(url: string): boolean {
+  if (!url) return false
+  try {
+    const host = new URL(normalizeUrl(url)).hostname
+    return Object.keys(GATED_BOARDS).some((h) => host.includes(h))
+  } catch { return false }
+}
+
+function gatedBoardName(url: string): string {
+  try {
+    const host = new URL(normalizeUrl(url)).hostname
+    return Object.entries(GATED_BOARDS).find(([h]) => host.includes(h))?.[1] ?? "this site"
+  } catch { return "this site" }
 }
 
 function normalizeUrl(value: string): string {
