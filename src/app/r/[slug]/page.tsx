@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
-import { useParams } from "next/navigation"
+import { useEffect, useState, useRef, Suspense } from "react"
+import { useParams, useSearchParams } from "next/navigation"
 import { QuestionCard } from "@/components/question-card"
 import type { QAPair, ScoreLevel } from "@/lib/session-types"
 import type { SavedSession } from "@/lib/api/kv"
@@ -38,8 +38,10 @@ const overallConfig: Record<ScoreLevel, { label: string; bg: string; text: strin
   weak:     { label: "Needs more prep",    bg: "bg-[var(--state-negative)]",  text: "text-[var(--state-negative-foreground)]" },
 }
 
-export default function SavedReportPage() {
+function SavedReportContent() {
   const { slug } = useParams<{ slug: string }>()
+  const searchParams = useSearchParams()
+  const compact = searchParams.get("compact") === "true"
   const [session, setSession] = useState<SavedSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -81,6 +83,66 @@ export default function SavedReportPage() {
   const overallLevel = session.report.overallImpressionLevel
   const overall = overallConfig[overallLevel]
   const scorePercent = numericScore !== null ? Math.round((numericScore / 10) * 100) : 50
+
+  // Compact (morning-of) view
+  if (compact) {
+    const weakQs = answers.filter(qa => {
+      if (!qa.scores || qa.scores.length === 0) return false
+      const sum = qa.scores.reduce((acc, s) => acc + levelValue[s.level], 0)
+      const score = (sum / (qa.scores.length * 3)) * 10
+      return score < 4
+    })
+    return (
+      <main className="min-h-screen flex flex-col">
+        <div className="w-full h-px bg-foreground/10" />
+        <div className="flex items-center justify-between px-8 py-5">
+          <div>
+            <p className="font-sans text-xs font-medium tracking-[0.2em] uppercase text-muted-foreground">{session.context.companyName}</p>
+            <p className="font-sans text-xs text-muted-foreground/60">{session.setup.stage.replace("-", " ")} · morning of</p>
+          </div>
+          <a href={`/r/${slug}`} className="font-sans text-xs text-muted-foreground hover:text-foreground transition-colors">
+            Full report →
+          </a>
+        </div>
+        <div className="flex-1 px-8 max-w-2xl mx-auto w-full py-8">
+          <div className="flex items-center gap-3 mb-10">
+            <span className={`font-sans text-xs font-medium tracking-[0.1em] uppercase px-2.5 py-1 rounded ${overall.bg} ${overall.text}`}>
+              {overall.label}
+            </span>
+            {numericScore !== null && (
+              <span className="font-heading text-2xl font-light">{numericScore}<span className="text-muted-foreground text-sm">/10</span></span>
+            )}
+          </div>
+
+          {weakQs.length === 0 ? (
+            <p className="font-sans text-sm text-muted-foreground">No weak questions — you were solid across the board.</p>
+          ) : (
+            <div className="flex flex-col gap-8">
+              <p className="font-sans text-xs font-medium tracking-[0.2em] uppercase text-muted-foreground">
+                Focus on these today
+              </p>
+              {weakQs.map((qa, i) => (
+                <div key={qa.questionId} className="flex flex-col gap-3">
+                  <p className="font-sans text-xs text-muted-foreground/60">Q{answers.indexOf(qa) + 1}</p>
+                  <p className="font-sans text-sm text-foreground leading-relaxed">{qa.questionText}</p>
+                  {qa.sampleAnswer && (
+                    <div className="pl-4 border-l-2 border-border mt-1">
+                      <p className="font-sans text-xs font-medium tracking-[0.1em] uppercase text-muted-foreground mb-1">Stronger answer</p>
+                      <p className="font-sans text-sm text-muted-foreground leading-relaxed italic">{qa.sampleAnswer}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="w-full h-px bg-foreground/10 mt-auto" />
+        <div className="px-8 py-4">
+          <p className="text-xs text-muted-foreground font-sans">Rehearse · Morning of · {session.context.companyName}</p>
+        </div>
+      </main>
+    )
+  }
 
   const handleSelectQ = (i: number) => {
     setSelectedQ(i)
@@ -168,9 +230,15 @@ export default function SavedReportPage() {
           />
         </div>
 
-        <div className="pt-6 border-t border-border">
-          <a href="/" className="font-sans text-xs tracking-[0.08em] uppercase border border-border rounded px-4 py-2 hover:border-foreground/40 transition-colors inline-block">
-            Start a new session →
+        <div className="pt-6 border-t border-border flex items-center gap-4 flex-wrap">
+          <a href="/sessions" className="font-sans text-xs text-muted-foreground hover:text-foreground transition-colors">
+            ← Session history
+          </a>
+          <a href={`/r/${slug}?compact=true`} className="font-sans text-xs tracking-[0.08em] uppercase border border-border rounded px-4 py-2 hover:border-foreground/40 transition-colors">
+            Morning of ↗
+          </a>
+          <a href="/setup" className="font-sans text-xs tracking-[0.08em] uppercase border border-border rounded px-4 py-2 hover:border-foreground/40 transition-colors">
+            New session →
           </a>
         </div>
 
@@ -181,5 +249,17 @@ export default function SavedReportPage() {
         <p className="text-xs text-muted-foreground font-sans">Rehearse · Feedback report</p>
       </div>
     </main>
+  )
+}
+
+export default function SavedReportPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center">
+        <p className="font-sans text-sm text-muted-foreground animate-pulse">Loading report…</p>
+      </main>
+    }>
+      <SavedReportContent />
+    </Suspense>
   )
 }

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getToken, getSessionsForToken } from "@/lib/api/kv"
+import type { SavedSession } from "@/lib/api/kv"
+import type { ScoreLevel } from "@/lib/session-types"
 
 export async function GET(req: NextRequest) {
   const tokenId = req.nextUrl.searchParams.get("t")
@@ -21,13 +23,16 @@ export async function GET(req: NextRequest) {
       stage: s.setup.stage,
       overallLevel: s.report.overallImpressionLevel,
       score: computeScore(s),
+      scoreDelta: null, // computed client-side from grouped data
+      weakSpots: computeWeakSpots(s),
       hasDebrief: !!s.debrief,
     })),
   })
 }
 
-function computeScore(session: { simulation: { answers: Array<{ scores?: Array<{ level: string }> }> } }): number | null {
-  const levelValue: Record<string, number> = { weak: 1, moderate: 2, strong: 3 }
+const levelValue: Record<string, number> = { weak: 1, moderate: 2, strong: 3 }
+
+function computeScore(session: SavedSession): number | null {
   const scores = session.simulation.answers
     .filter(a => a.scores && a.scores.length > 0)
     .map(a => {
@@ -36,4 +41,21 @@ function computeScore(session: { simulation: { answers: Array<{ scores?: Array<{
     })
   if (scores.length === 0) return null
   return Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
+}
+
+function computeWeakSpots(session: SavedSession): string[] {
+  const criterionCounts: Record<string, { weak: number; total: number }> = {}
+  for (const qa of session.simulation.answers) {
+    if (!qa.scores) continue
+    for (const s of qa.scores) {
+      if (!criterionCounts[s.criterion]) criterionCounts[s.criterion] = { weak: 0, total: 0 }
+      criterionCounts[s.criterion].total++
+      if (s.level === "weak") criterionCounts[s.criterion].weak++
+    }
+  }
+  return Object.entries(criterionCounts)
+    .filter(([, v]) => v.weak / v.total >= 0.5)
+    .sort((a, b) => b[1].weak - a[1].weak)
+    .slice(0, 2)
+    .map(([criterion]) => criterion)
 }
