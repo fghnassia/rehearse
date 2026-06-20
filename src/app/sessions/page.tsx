@@ -27,6 +27,13 @@ interface CompanyGroup {
   }
 }
 
+const DEMO_SESSIONS: SessionSummary[] = [
+  { slug: "stripe-rec-1", createdAt: new Date(Date.now() - 1000*60*60*72).toISOString(), companyName: "Stripe", roleTitle: "Senior Product Designer, AI Platform", stage: "recruiter", overallLevel: "weak", score: 4.8, weakSpots: ["structure", "specificity"], hasDebrief: false },
+  { slug: "stripe-rec-2", createdAt: new Date(Date.now() - 1000*60*60*24).toISOString(), companyName: "Stripe", roleTitle: "Senior Product Designer, AI Platform", stage: "recruiter", overallLevel: "moderate", score: 6.6, weakSpots: ["specificity"], hasDebrief: false },
+  { slug: "stripe-hm-1", createdAt: new Date(Date.now() - 1000*60*60*2).toISOString(), companyName: "Stripe", roleTitle: "Senior Product Designer, AI Platform", stage: "hiring-manager", overallLevel: "moderate", score: 5.9, weakSpots: ["impact"], hasDebrief: false },
+  { slug: "linear-rec-1", createdAt: new Date(Date.now() - 1000*60*60*48).toISOString(), companyName: "Linear", roleTitle: "Product Designer", stage: "recruiter", overallLevel: "strong", score: 8.2, weakSpots: [], hasDebrief: true },
+]
+
 const stageLabel: Record<string, string> = {
   recruiter: "Recruiter",
   "hiring-manager": "Hiring Mgr",
@@ -100,6 +107,11 @@ function SessionsContent() {
   const [error, setError] = useState("")
 
   useEffect(() => {
+    if (searchParams.get("demo") === "true") {
+      setSessions(DEMO_SESSIONS)
+      setPhase("sessions")
+      return
+    }
     const tokenId = tokenFromUrl ?? localStorage.getItem("rehearse_token")
     if (!tokenId) { setPhase("email-form"); return }
     if (tokenFromUrl) localStorage.setItem("rehearse_token", tokenFromUrl)
@@ -108,7 +120,7 @@ function SessionsContent() {
       .then(r => { if (!r.ok) throw new Error(); return r.json() })
       .then(data => { setSessions(data.sessions ?? []); setPhase("sessions") })
       .catch(() => { localStorage.removeItem("rehearse_token"); setPhase("email-form") })
-  }, [tokenFromUrl])
+  }, [tokenFromUrl, searchParams])
 
   const handleEmailSubmit = async () => {
     if (!email.includes("@")) return

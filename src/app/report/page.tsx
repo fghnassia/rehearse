@@ -352,6 +352,18 @@ export default function ReportPage() {
               </div>
             </div>
 
+            {/* Save prompt — above question grid so it's seen */}
+            {session.setup && session.context && session.simulation && session.report && (
+              <div className="mb-10">
+                <SavePrompt
+                  setup={session.setup}
+                  context={session.context}
+                  simulation={session.simulation}
+                  report={session.report}
+                />
+              </div>
+            )}
+
             {/* Question grid */}
             <div className="mb-2">
               <p className="font-sans text-xs font-medium tracking-[0.2em] uppercase text-muted-foreground mb-4">
@@ -515,18 +527,6 @@ export default function ReportPage() {
                 </Button>
               </div>
             </div>
-
-            {/* Save prompt */}
-            {session.setup && session.context && session.simulation && session.report && (
-              <div className="mb-10">
-                <SavePrompt
-                  setup={session.setup}
-                  context={session.context}
-                  simulation={session.simulation}
-                  report={session.report}
-                />
-              </div>
-            )}
 
             {/* Session notice */}
             <p className="font-sans text-xs text-muted-foreground/60 leading-relaxed">
