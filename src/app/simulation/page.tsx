@@ -20,6 +20,7 @@ export default function SimulationPage() {
 
   const [phase, setPhase] = useState<SimPhase>("loading")
   const [simulation, setSimulation] = useState<SimulationData | null>(null)
+  const [selectedCount, setSelectedCount] = useState(0)
   const [currentQ, setCurrentQ] = useState(0)
   const [textAnswer, setTextAnswer] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
@@ -39,6 +40,7 @@ export default function SimulationPage() {
 
     if (session.simulation?.questions.length) {
       setSimulation(session.simulation)
+      setSelectedCount(session.simulation.questions.length)
       session.simulation.answers.forEach((qa) => {
         const idx = parseInt(qa.questionId.replace("q", ""))
         answersMapRef.current[idx] = qa
@@ -65,6 +67,7 @@ export default function SimulationPage() {
         }
         updateSimulation(sim)
         setSimulation(sim)
+        setSelectedCount(sim.questions.length)
         setPhase("ready")
       })
       .catch((msg: string) => {
@@ -221,7 +224,13 @@ export default function SimulationPage() {
             personaRole={simulation.personaRole}
             behaviorNote={simulation.behaviorNote}
             questionCount={simulation.questions.length}
-            onBegin={() => setPhase("interview")}
+            selectedCount={selectedCount}
+            onCountChange={setSelectedCount}
+            onBegin={() => {
+              const trimmed = { ...simulation, questions: simulation.questions.slice(0, selectedCount) }
+              setSimulation(trimmed)
+              setPhase("interview")
+            }}
           />
         )}
 

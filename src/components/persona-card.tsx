@@ -1,3 +1,5 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 
 interface PersonaCardProps {
@@ -6,6 +8,8 @@ interface PersonaCardProps {
   personaRole: string
   behaviorNote: string
   questionCount: number
+  selectedCount: number
+  onCountChange: (n: number) => void
   onBegin: () => void
 }
 
@@ -21,8 +25,12 @@ export function PersonaCard({
   personaRole,
   behaviorNote,
   questionCount,
+  selectedCount,
+  onCountChange,
   onBegin,
 }: PersonaCardProps) {
+  const estTime = Math.ceil(selectedCount * 2.5)
+
   return (
     <div className="flex flex-col gap-8 max-w-xl">
       <div className="flex flex-col gap-1">
@@ -37,15 +45,33 @@ export function PersonaCard({
         {behaviorNote}
       </p>
 
-      <div className="flex items-center gap-6">
-        <div className="flex flex-col gap-0.5">
-          <p className="font-sans text-xs font-medium tracking-[0.1em] uppercase text-muted-foreground">Questions</p>
-          <p className="font-sans text-sm text-foreground">{questionCount}</p>
+      {/* Question count + slider */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline gap-6">
+            <div className="flex flex-col gap-0.5">
+              <p className="font-sans text-xs font-medium tracking-[0.1em] uppercase text-muted-foreground">Questions</p>
+              <p className="font-sans text-sm text-foreground">{selectedCount}</p>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <p className="font-sans text-xs font-medium tracking-[0.1em] uppercase text-muted-foreground">Est. time</p>
+              <p className="font-sans text-sm text-foreground">{estTime} min</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-sans text-xs text-muted-foreground/60">3</span>
+            <span className="font-sans text-xs text-muted-foreground/40">—</span>
+            <span className="font-sans text-xs text-muted-foreground/60">{questionCount}</span>
+          </div>
         </div>
-        <div className="flex flex-col gap-0.5">
-          <p className="font-sans text-xs font-medium tracking-[0.1em] uppercase text-muted-foreground">Est. time</p>
-          <p className="font-sans text-sm text-foreground">{Math.ceil(questionCount * 2.5)} min</p>
-        </div>
+        <input
+          type="range"
+          min={3}
+          max={questionCount}
+          value={selectedCount}
+          onChange={e => onCountChange(Number(e.target.value))}
+          className="w-full accent-foreground h-1 rounded-full cursor-pointer"
+        />
       </div>
 
       <Button
