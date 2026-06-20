@@ -9,6 +9,7 @@ import { QuestionCard } from "@/components/question-card"
 import { DonutChart } from "@/components/score-display"
 import { useSession } from "@/lib/session-context"
 import type { QAPair, ScoreLevel } from "@/lib/session-types"
+import { SavePrompt } from "@/components/save-prompt"
 
 type ReportPhase = "generating" | "ready" | "error"
 type ExportMenu = "transcript" | "feedback" | null
@@ -514,6 +515,18 @@ export default function ReportPage() {
                 </Button>
               </div>
             </div>
+
+            {/* Save prompt */}
+            {session.setup && session.context && session.simulation && session.report && (
+              <div className="mb-10">
+                <SavePrompt
+                  setup={session.setup}
+                  context={session.context}
+                  simulation={session.simulation}
+                  report={session.report}
+                />
+              </div>
+            )}
 
             {/* Session notice */}
             <p className="font-sans text-xs text-muted-foreground/60 leading-relaxed">
