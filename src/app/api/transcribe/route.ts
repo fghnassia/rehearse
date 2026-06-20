@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
   body.append("model", "whisper-large-v3")
   body.append("language", "en")
   body.append("response_format", "json")
+  body.append("prompt", "Product designer interview. Topics: UX, agentic UX, AI-native, design systems, Figma, user research, stakeholders, design process, portfolio, cross-functional, iteration, wireframes, prototyping.")
 
   const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
     method: "POST",

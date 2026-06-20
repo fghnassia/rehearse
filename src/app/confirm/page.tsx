@@ -283,7 +283,7 @@ export default function ConfirmPage() {
                 className="font-sans text-sm tracking-[0.1em] uppercase px-8"
                 onClick={() => router.push("/research")}
               >
-                Looks right — continue →
+                Looks right →
               </Button>
             </div>
           </>

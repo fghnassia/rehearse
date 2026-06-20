@@ -171,7 +171,7 @@ export default function ResearchPage() {
                 className="font-sans text-sm tracking-[0.1em] uppercase px-8"
                 onClick={() => router.push("/simulation")}
               >
-                Begin Simulation →
+                Start simulation →
               </Button>
             </div>
           </>
@@ -340,36 +340,28 @@ function SourcesSummary({
           {downvotedIndex !== null && (
             <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setDownvotedIndex(null)}>
               <div className="bg-background border border-border rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">What did we miss?</p>
+                  <button onClick={() => setDownvotedIndex(null)} className="text-muted-foreground/50 hover:text-muted-foreground transition-colors" aria-label="Close">✕</button>
+                </div>
                 {feedbackSent ? (
                   <p className="font-sans text-sm text-foreground">Thanks — we'll look into it.</p>
                 ) : (
                   <>
-                    <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground mb-3">What did we miss?</p>
-                    <p className="font-sans text-sm text-foreground mb-4 leading-relaxed">
-                      Tell us what this source got wrong, or what kind of source would have been more useful.
-                    </p>
                     <textarea
                       autoFocus
                       value={feedbackText}
                       onChange={e => setFeedbackText(e.target.value)}
-                      placeholder="e.g. This is the wrong company, or we needed more interview-specific content…"
+                      placeholder="e.g. Wrong company, not specific enough, outdated…"
                       className="w-full font-sans text-sm border border-border rounded p-3 min-h-[100px] resize-none bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring mb-4"
                     />
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={submitFeedback}
-                        disabled={!feedbackText.trim()}
-                        className="font-sans text-xs tracking-[0.1em] uppercase bg-foreground text-background px-4 py-2 rounded disabled:opacity-40 hover:bg-foreground/80 transition-colors"
-                      >
-                        Send feedback
-                      </button>
-                      <button
-                        onClick={() => setDownvotedIndex(null)}
-                        className="font-sans text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                    <button
+                      onClick={submitFeedback}
+                      disabled={!feedbackText.trim()}
+                      className="font-sans text-xs tracking-[0.1em] uppercase bg-foreground text-background px-4 py-2 rounded disabled:opacity-40 hover:bg-foreground/80 transition-colors w-full"
+                    >
+                      Send feedback
+                    </button>
                   </>
                 )}
               </div>

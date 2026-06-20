@@ -32,14 +32,16 @@ export interface QAPair {
   questionId: string
   questionText: string
   userAnswer: string
-  scores: Array<{
+  skipped?: boolean
+  // Populated at report time, not during simulation
+  scores?: Array<{
     criterion: string
     level: ScoreLevel
     rationale: string
   }>
-  whatWorked: string
-  whatToImprove: string
-  sampleAnswer: string
+  whatWorked?: string
+  whatToImprove?: string
+  sampleAnswer?: string
 }
 
 export interface SimulationData {
@@ -48,6 +50,7 @@ export interface SimulationData {
   behaviorNote: string
   questions: string[]
   answers: QAPair[]
+  skippedQuestions?: Array<{ questionId: string; questionText: string }>
 }
 
 export interface ReportData {
