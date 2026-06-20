@@ -61,13 +61,13 @@ export function PersonaCard({
           <div className="flex items-center gap-2">
             <span className="font-sans text-xs text-muted-foreground/60">3</span>
             <span className="font-sans text-xs text-muted-foreground/40">—</span>
-            <span className="font-sans text-xs text-muted-foreground/60">{questionCount}</span>
+            <span className="font-sans text-xs text-muted-foreground/60">15</span>
           </div>
         </div>
         <input
           type="range"
           min={3}
-          max={questionCount}
+          max={15}
           value={selectedCount}
           onChange={e => onCountChange(Number(e.target.value))}
           className="w-full accent-foreground h-1 rounded-full cursor-pointer"
