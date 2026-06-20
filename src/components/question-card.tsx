@@ -73,7 +73,7 @@ export function QuestionCard({ questionNumber, qa }: QuestionCardProps) {
 
       {/* Stronger answer */}
       {qa.sampleAnswer && (
-        <Accordion type="single" collapsible>
+        <Accordion>
           <AccordionItem value="sample" className="border-none">
             <AccordionTrigger className="font-sans text-xs tracking-[0.08em] uppercase text-muted-foreground hover:text-foreground hover:no-underline py-2">
               See a stronger answer — adapt in your own voice
