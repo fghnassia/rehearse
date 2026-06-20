@@ -26,7 +26,7 @@ export async function sendMagicLink({
   const reportUrl = `${appUrl}/r/${sessionSlug}`
 
   const { error } = await getResend().emails.send({
-    from: "Rehearse <noreply@rehearse.app>",
+    from: "Rehearse <onboarding@resend.dev>",
     to,
     subject: `Your Rehearse report — ${companyName} ${stage.replace("-", " ")}`,
     html: `
@@ -87,7 +87,7 @@ export async function sendDebriefReminder({
   const debriefUrl = `${appUrl}/r/${sessionSlug}?debrief=1`
 
   const { error } = await getResend().emails.send({
-    from: "Rehearse <noreply@rehearse.app>",
+    from: "Rehearse <onboarding@resend.dev>",
     to,
     subject: `How did the ${companyName} interview go?`,
     html: `
