@@ -164,6 +164,7 @@ export default function SimulationPage() {
 
   const progressLabel = simulation ? `Question ${currentQ + 1} of ${simulation.questions.length}` : ""
   const isActive = phase === "interview" || phase === "evaluating" || phase === "skipping" || phase === "transitioning"
+  const isEvaluating = (phase as string) === "evaluating"
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -240,14 +241,14 @@ export default function SimulationPage() {
                 <div className="flex flex-col gap-3">
                   <VoiceInput
                     key={currentQ}
-                    disabled={phase === "evaluating"}
+                    disabled={isEvaluating}
                     onTranscript={(t) => setTextAnswer(prev => prev ? `${prev} ${t}` : t)}
                   />
                   <Textarea
                     placeholder="Or type directly…"
                     value={textAnswer}
                     onChange={(e) => setTextAnswer(e.target.value)}
-                    disabled={phase === "evaluating"}
+                    disabled={isEvaluating}
                     className="font-sans text-sm min-h-[120px] resize-none leading-relaxed"
                   />
                 </div>
@@ -263,7 +264,7 @@ export default function SimulationPage() {
                   {currentQ > 0 && (
                     <button
                       onClick={handleBack}
-                      disabled={phase === "evaluating"}
+                      disabled={isEvaluating}
                       className="font-sans text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
                     >
                       ←
@@ -272,14 +273,14 @@ export default function SimulationPage() {
                   <Button
                     size="lg"
                     className="font-sans text-sm tracking-[0.1em] uppercase px-8"
-                    disabled={!currentAnswer || phase === "evaluating"}
+                    disabled={!currentAnswer || isEvaluating}
                     onClick={handleSubmitAnswer}
                   >
                     {currentQ + 1 < simulation.questions.length ? "Submit →" : "Finish →"}
                   </Button>
                   <button
                     onClick={handleSkip}
-                    disabled={phase === "evaluating"}
+                    disabled={isEvaluating}
                     className="font-sans text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 ml-2"
                   >
                     Skip
