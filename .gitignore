@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# generated screenshots (regenerable via scripts/take-screenshots.js)
+/screenshots/
+
 # next.js
 /.next/
 /out/
