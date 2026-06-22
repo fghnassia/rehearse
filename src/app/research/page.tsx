@@ -11,6 +11,7 @@ import { CoverageIndicator } from "@/components/coverage-indicator"
 import { ThumbsDown, X, Info } from "@phosphor-icons/react"
 import { useSession } from "@/lib/session-context"
 import type { ResearchData, ResearchSource } from "@/lib/session-types"
+import { persistResearchSummary } from "@/lib/local-profile"
 
 const statusMessages = [
   "Searching Glassdoor…",
@@ -32,6 +33,17 @@ export default function ResearchPage() {
 
   const hasFetched = useRef(false)
 
+  // Cycle through status messages while searching — kept in its own effect so the
+  // rotation survives StrictMode's mount/cleanup/mount cycle (the fetch guard below
+  // would otherwise orphan an interval created inside it).
+  useEffect(() => {
+    if (phase !== "searching") return
+    const interval = setInterval(() => {
+      setStatusIndex((i) => (i + 1) % statusMessages.length)
+    }, 1200)
+    return () => clearInterval(interval)
+  }, [phase])
+
   useEffect(() => {
     if (!hydrated) return
     // Redirect if arrived without setup data
@@ -43,11 +55,6 @@ export default function ResearchPage() {
     // Prevent double-fetch in React StrictMode
     if (hasFetched.current) return
     hasFetched.current = true
-
-    // Cycle through status messages while fetching
-    const interval = setInterval(() => {
-      setStatusIndex((i) => (i + 1) % statusMessages.length)
-    }, 1200)
 
     fetch("/api/research", {
       method: "POST",
@@ -62,18 +69,22 @@ export default function ResearchPage() {
         return r.json()
       })
       .then((data: ResearchData) => {
-        clearInterval(interval)
         updateResearch(data)
         setResearch(data)
+        if (data.synthesizedTakeaways && data.synthesizedTakeaways.length > 0) {
+          persistResearchSummary({
+            companyName: data.companyName,
+            synthesizedTakeaways: data.synthesizedTakeaways,
+            sourceCount: data.sourceCount,
+            researchedAt: new Date().toISOString(),
+          })
+        }
         setPhase("results")
       })
       .catch((msg: string) => {
-        clearInterval(interval)
         setErrorMessage(typeof msg === "string" ? msg : "Research failed. Please try again.")
         setPhase("error")
       })
-
-    return () => clearInterval(interval)
   }, [hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -134,6 +145,22 @@ export default function ResearchPage() {
               sourceCount={research.sourceCount}
               className="mb-8"
             />
+
+            {research.synthesizedTakeaways && research.synthesizedTakeaways.length > 0 && (
+              <div className="mb-8">
+                <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground mb-3">
+                  What we found
+                </p>
+                <ul className="flex flex-col gap-2">
+                  {research.synthesizedTakeaways.map((takeaway, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <span className="mt-1.5 w-1 h-1 rounded-full bg-foreground/40 shrink-0" />
+                      <p className="font-sans text-sm text-foreground leading-relaxed">{takeaway}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {research.disclaimer && (
               <Alert className="mb-8">

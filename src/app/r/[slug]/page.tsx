@@ -81,11 +81,17 @@ function SavedReportContent() {
   const answers = session.simulation.answers
   const numericScore = overallNumericScore(answers)
   const overallLevel = session.report.overallImpressionLevel
+  // Derive level from numeric score so badge and summary are consistent.
+  // Fall back to AI-generated level only when no answered questions exist.
+  const derivedLevel: ScoreLevel = numericScore !== null
+    ? (numericScore >= 7 ? "strong" : numericScore >= 4 ? "moderate" : "weak")
+    : overallLevel
   const overall = overallConfig[overallLevel]
   const scorePercent = numericScore !== null ? Math.round((numericScore / 10) * 100) : 50
 
   // Compact (morning-of) view
   if (compact) {
+    const compactOverall = overallConfig[derivedLevel]
     const weakQs = answers.filter(qa => {
       if (!qa.scores || qa.scores.length === 0) return false
       const sum = qa.scores.reduce((acc, s) => acc + levelValue[s.level], 0)
@@ -106,8 +112,8 @@ function SavedReportContent() {
         </div>
         <div className="flex-1 px-8 max-w-2xl mx-auto w-full py-8">
           <div className="flex items-center gap-3 mb-10">
-            <span className={`font-sans text-xs font-medium tracking-[0.1em] uppercase px-2.5 py-1 rounded ${overall.bg} ${overall.text}`}>
-              {overall.label}
+            <span className={`font-sans text-xs font-medium tracking-[0.1em] uppercase px-2.5 py-1 rounded ${compactOverall.bg} ${compactOverall.text}`}>
+              {compactOverall.label}
             </span>
             {numericScore !== null && (
               <span className="font-heading text-2xl font-light">{numericScore}<span className="text-muted-foreground text-sm">/10</span></span>

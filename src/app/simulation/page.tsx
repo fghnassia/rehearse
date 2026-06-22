@@ -127,31 +127,29 @@ export default function SimulationPage() {
     setPhase("interview")
   }
 
-  const handleSkip = async () => {
-    if (!simulation || !session.setup || !session.context) return
-    setPhase("skipping")
-    const skipped = { questionId: `q${currentQ}`, questionText: simulation.questions[currentQ] }
-    try {
-      const res = await fetch("/api/generate-question", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setup: session.setup, context: session.context, exclude: simulation.questions }),
-      })
-      if (!res.ok) throw new Error()
-      const { question } = await res.json()
-      const newQuestions = [...simulation.questions]
-      newQuestions[currentQ] = question
-      const updatedSim: SimulationData = {
-        ...simulation,
-        questions: newQuestions,
-        skippedQuestions: [...(simulation.skippedQuestions ?? []), skipped],
-      }
-      setSimulation(updatedSim)
-      updateSimulation(updatedSim)
+  const handleSkip = () => {
+    if (!simulation) return
+    const qaPair: QAPair = {
+      questionId: `q${currentQ}`,
+      questionText: simulation.questions[currentQ],
+      userAnswer: "",
+      status: "skipped",
+    }
+    answersMapRef.current[currentQ] = qaPair
+    const updatedAnswers = Object.entries(answersMapRef.current)
+      .sort(([a], [b]) => parseInt(a) - parseInt(b))
+      .map(([, v]) => v)
+    const updatedSim = { ...simulation, answers: updatedAnswers }
+    setSimulation(updatedSim)
+    updateSimulation(updatedSim)
+
+    if (currentQ + 1 < simulation.questions.length) {
+      setCurrentQ(q => q + 1)
       setTextAnswer("")
       setPhase("interview")
-    } catch {
-      setPhase("interview")
+    } else {
+      setPhase("complete")
+      setTimeout(() => router.push("/report"), 1500)
     }
   }
 

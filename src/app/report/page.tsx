@@ -10,6 +10,7 @@ import { DonutChart } from "@/components/score-display"
 import { useSession } from "@/lib/session-context"
 import type { QAPair, ScoreLevel } from "@/lib/session-types"
 import { SavePrompt } from "@/components/save-prompt"
+import { appendScoreSnapshot } from "@/lib/local-profile"
 
 type ReportPhase = "generating" | "ready" | "error"
 type ExportMenu = "transcript" | "feedback" | null
@@ -172,6 +173,56 @@ export default function ReportPage() {
           generatedAt: data.generatedAt,
         })
         setPhase("ready")
+
+        // Persist score snapshot to local profile
+        try {
+          const answeredWithScores = (data.evaluatedAnswers as QAPair[]).filter(qa => qa.scores && qa.scores.length > 0)
+          const criterionMap: Record<string, string> = {
+            "Clarity": "structure",
+            "Specificity": "specificity",
+            "Relevance": "relevance",
+            "AI fluency": "aiFluency",
+            "Overall impression": "communication",
+          }
+          const accum: Record<string, { sum: number; count: number }> = {
+            structure: { sum: 0, count: 0 },
+            specificity: { sum: 0, count: 0 },
+            relevance: { sum: 0, count: 0 },
+            communication: { sum: 0, count: 0 },
+            aiFluency: { sum: 0, count: 0 },
+          }
+          for (const qa of answeredWithScores) {
+            for (const s of qa.scores!) {
+              const key = criterionMap[s.criterion]
+              if (key && key in accum) {
+                accum[key].sum += levelValue[s.level]
+                accum[key].count++
+              }
+            }
+          }
+          const criteriaScores = Object.fromEntries(
+            Object.entries(accum).map(([k, { sum, count }]) => [
+              k, count > 0 ? Math.round((sum / (count * 3)) * 10 * 10) / 10 : 0,
+            ])
+          ) as { structure: number; specificity: number; relevance: number; communication: number; aiFluency: number }
+
+          const overallScoreValue = overallNumericScore(data.evaluatedAnswers)
+          const stageMap: Record<string, "recruiter" | "hiring_manager" | "portfolio_review"> = {
+            "recruiter": "recruiter",
+            "hiring-manager": "hiring_manager",
+            "portfolio-review": "portfolio_review",
+          }
+          appendScoreSnapshot({
+            sessionId: crypto.randomUUID(),
+            company: session.context!.companyName,
+            stage: stageMap[session.setup!.stage] ?? "recruiter",
+            date: new Date().toISOString(),
+            overallScore: overallScoreValue ?? 0,
+            criteriaScores,
+          })
+        } catch {
+          // Non-fatal: local profile persistence is best-effort
+        }
       })
       .catch((msg: string) => {
         setErrorMessage(typeof msg === "string" ? msg : "Failed to generate report.")
@@ -366,13 +417,24 @@ export default function ReportPage() {
 
             {/* Question grid */}
             <div className="mb-2">
-              <p className="font-sans text-xs font-medium tracking-[0.2em] uppercase text-muted-foreground mb-4">
-                Questions
-              </p>
+              <div className="flex items-baseline gap-3 mb-4">
+                <p className="font-sans text-xs font-medium tracking-[0.2em] uppercase text-muted-foreground">
+                  Questions
+                </p>
+                {(() => {
+                  const skipped = evaluatedAnswers.filter(qa => qa.status === "skipped").length
+                  return skipped > 0 ? (
+                    <p className="font-sans text-xs text-muted-foreground">
+                      {skipped} of {evaluatedAnswers.length} skipped
+                    </p>
+                  ) : null
+                })()}
+              </div>
               <div className="grid grid-cols-3 gap-3">
                 {evaluatedAnswers.map((qa, i) => {
-                  const level = qaLevel(qa)
-                  const score = qaScore(qa)
+                  const isSkipped = qa.status === "skipped"
+                  const level = isSkipped ? null : qaLevel(qa)
+                  const score = isSkipped ? null : qaScore(qa)
                   const isSelected = selectedQ === i
                   return (
                     <button
@@ -389,11 +451,19 @@ export default function ReportPage() {
                           Q{i + 1}
                         </span>
                         <div className="flex items-center gap-1.5">
-                          {level && (
-                            <span className={`inline-block w-2 h-2 rounded-full ${levelDotColor[level]}`} />
-                          )}
-                          {score !== null && (
-                            <span className="font-sans text-xs text-muted-foreground">{score}</span>
+                          {isSkipped ? (
+                            <span className="font-sans text-[10px] tracking-[0.08em] uppercase text-muted-foreground/60">
+                              Skipped
+                            </span>
+                          ) : (
+                            <>
+                              {level && (
+                                <span className={`inline-block w-2 h-2 rounded-full ${levelDotColor[level]}`} />
+                              )}
+                              {score !== null && (
+                                <span className="font-sans text-xs text-muted-foreground">{score}</span>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>

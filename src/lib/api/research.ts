@@ -41,7 +41,11 @@ export async function runResearch(
 ): Promise<ResearchData> {
   const resolvedCompanyName = companyName || extractCompanyName(jobPostingUrl)
   const results = await searchCompanyInterviews(resolvedCompanyName, serperApiKey)
+  // Coverage level reflects total signal found; classify before capping.
   const coverageLevel = classifyCoverage(results)
+  // Cap the sources we keep and surface — sourceCount must match what we display.
+  const MAX_SOURCES = 8
+  const keptSources = results.slice(0, MAX_SOURCES)
 
   const disclaimer =
     coverageLevel === "none"
@@ -54,8 +58,8 @@ export async function runResearch(
     companyName: resolvedCompanyName,
     roleTitle: "Product Designer",
     coverageLevel,
-    sourceCount: results.length,
-    sources: results.slice(0, 8).map((r) => ({
+    sourceCount: keptSources.length,
+    sources: keptSources.map((r) => ({
       title: r.title,
       url: r.link,
       snippet: r.snippet,

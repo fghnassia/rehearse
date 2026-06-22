@@ -25,13 +25,52 @@ export interface ResearchData {
   sourceCount: number
   sources: ResearchSource[]
   insights: string
+  synthesizedTakeaways?: string[]
   disclaimer?: string
+}
+
+export interface InferredIdentity {
+  role: string
+  seniority: string
+  targetField: string
+  experienceSummary: string
+  lastUpdated: string
+}
+
+export interface CompanyResearchSummary {
+  companyName: string
+  synthesizedTakeaways: string[]
+  sourceCount: number
+  researchedAt: string
+}
+
+export interface ScoreSnapshot {
+  sessionId: string
+  company: string
+  stage: 'recruiter' | 'hiring_manager' | 'portfolio_review'
+  date: string
+  overallScore: number
+  criteriaScores: {
+    structure: number
+    specificity: number
+    relevance: number
+    communication: number
+    aiFluency: number
+  }
+}
+
+export interface LocalProfileData {
+  profileId: string
+  inferredIdentity?: InferredIdentity
+  researchSummaries: Record<string, CompanyResearchSummary>
+  scoreSnapshots: ScoreSnapshot[]
 }
 
 export interface QAPair {
   questionId: string
   questionText: string
   userAnswer: string
+  status?: 'answered' | 'skipped'
   skipped?: boolean
   // Populated at report time, not during simulation
   scores?: Array<{

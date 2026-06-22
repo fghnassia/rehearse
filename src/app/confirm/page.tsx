@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { PipelineIndicator } from "@/components/pipeline-indicator"
 import { useSession } from "@/lib/session-context"
 import type { ContextData } from "@/lib/session-types"
+import { persistInferredIdentity, inferTargetField } from "@/lib/local-profile"
 
 const stageLabels: Record<string, string> = {
   "recruiter": "Recruiter Screen",
@@ -73,6 +74,15 @@ export default function ConfirmPage() {
   }, [hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stageLabel = session.setup ? stageLabels[session.setup.stage] ?? session.setup.stage : ""
+
+  // A "thin parse" is when we couldn't pull anything meaningful from the posting —
+  // either no insights at all, or only the forced "Compensation: Not specified" line.
+  // In that case we show an honest couldn't-read state and steer the user to paste,
+  // rather than rendering a lonely line that reads as broken.
+  const meaningfulInsights = (context?.jobInsights ?? []).filter(
+    (i) => !(i.category === "Compensation" && /not specified/i.test(i.points[0] ?? ""))
+  )
+  const thinParse = !!context && meaningfulInsights.length === 0
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -173,7 +183,22 @@ export default function ConfirmPage() {
               <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">
                 About the role
               </p>
-              {context.jobInsights.length > 0 ? (
+              {thinParse ? (
+                pasteSaved ? (
+                  <p className="font-sans text-sm text-muted-foreground leading-relaxed">
+                    We'll tailor your questions to the description you pasted.
+                  </p>
+                ) : (
+                  <div className="border-l-2 border-[var(--state-warning-foreground)] bg-[var(--state-warning)]/20 rounded-r px-4 py-3">
+                    <p className="font-sans text-sm text-foreground leading-relaxed">
+                      We couldn't read the details from this posting — it may be on a site we can't access directly.
+                    </p>
+                    <p className="font-sans text-sm text-muted-foreground leading-relaxed mt-1.5">
+                      Paste the job description below so we can tailor your questions to it.
+                    </p>
+                  </div>
+                )
+              ) : (
                 context.jobInsights.map((insight, i) => (
                   <div key={i} className="flex items-start gap-4">
                     <p className="font-sans text-xs font-medium text-muted-foreground uppercase tracking-[0.1em] w-28 shrink-0 pt-0.5">
@@ -184,10 +209,6 @@ export default function ConfirmPage() {
                     </p>
                   </div>
                 ))
-              ) : (
-                <p className="font-sans text-sm text-muted-foreground leading-relaxed">
-                  We couldn't extract structured data from this posting.
-                </p>
               )}
             </div>
 
@@ -200,14 +221,14 @@ export default function ConfirmPage() {
               ) : (
                 <>
                   <p className="font-sans text-xs text-muted-foreground leading-relaxed">
-                    Not what you expected?{" "}
+                    {thinParse ? "" : "Not what you expected? "}
                     <button
                       onClick={() => setPasteOpen((v) => !v)}
                       className="underline underline-offset-2 hover:text-foreground transition-colors"
                     >
                       Paste the job description as plain text
                     </button>{" "}
-                    and we'll use that instead.
+                    {thinParse ? "and we'll tailor everything to it." : "and we'll use that instead."}
                   </p>
                   {pasteOpen && (
                     <div className="mt-4 flex flex-col gap-3">
@@ -281,7 +302,18 @@ export default function ConfirmPage() {
               <Button
                 size="lg"
                 className="font-sans text-sm tracking-[0.1em] uppercase px-8"
-                onClick={() => router.push("/research")}
+                onClick={() => {
+                  if (context) {
+                    persistInferredIdentity({
+                      role: context.resumeProfile.title,
+                      seniority: context.resumeProfile.experience,
+                      targetField: inferTargetField(context.companyName),
+                      experienceSummary: context.resumeProfile.highlight,
+                      lastUpdated: new Date().toISOString(),
+                    })
+                  }
+                  router.push("/research")
+                }}
               >
                 Looks right →
               </Button>

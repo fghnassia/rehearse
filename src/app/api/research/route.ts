@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { runResearch } from "@/lib/api/research"
-import { getConfigSafe } from "@/lib/config"
+import { synthesizeResearch } from "@/lib/api/claude"
+import { getConfigSafe, getConfig } from "@/lib/config"
 
 export async function POST(req: NextRequest) {
   const { jobPostingUrl, companyName } = await req.json()
@@ -19,13 +20,31 @@ export async function POST(req: NextRequest) {
       sourceCount: 0,
       sources: [],
       insights: "",
+      synthesizedTakeaways: [],
       disclaimer: "SERPER_API_KEY is not configured. Add it to .env.local to enable real company research.",
     })
   }
 
   try {
     const data = await runResearch(jobPostingUrl, serperApiKey, companyName)
-    return NextResponse.json(data)
+
+    let synthesizedTakeaways: string[] = []
+    if (data.insights && data.coverageLevel !== "none") {
+      try {
+        const { anthropicApiKey } = getConfig()
+        synthesizedTakeaways = await synthesizeResearch(
+          data.companyName,
+          data.roleTitle,
+          data.insights,
+          anthropicApiKey
+        )
+      } catch (err) {
+        console.error("[research synthesis]", err)
+        // Non-fatal: return research without takeaways
+      }
+    }
+
+    return NextResponse.json({ ...data, synthesizedTakeaways })
   } catch (err) {
     console.error("[research]", err)
     return NextResponse.json({ error: "Research failed. Please try again." }, { status: 500 })

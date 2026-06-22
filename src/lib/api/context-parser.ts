@@ -188,8 +188,13 @@ async function fetchJobPage(jobUrl: string): Promise<{ companyName: string; role
       headers: { "User-Agent": "Mozilla/5.0 (compatible; Rehearse/1.0)" },
       signal: AbortSignal.timeout(6000),
     })
-    if (!res.ok) return null
     const html = await res.text()
+    // Don't trust the status code alone. Many job sites (SPA catch-all routes,
+    // soft-404s, bot-walls) return a non-2xx status with a full, usable HTML body —
+    // e.g. Linear serves complete job content under a 404. Only bail when the body is
+    // too small to contain anything useful (a genuine empty error page), letting
+    // Serper fill in instead.
+    if (!html || html.length < 1000) return null
 
     // Extract JSON-LD structured data first — job pages often put salary, location,
     // and description here even when the page is JS-rendered
@@ -372,10 +377,15 @@ export async function parseContext(
   // Page title is authoritative — Serper snippets only fill in if page fetch failed
   const roleTitle = roleFromPage || roleFromSerper || "Product Designer"
 
-  // Build job text for Claude — page body takes priority, Serper snippets fill gaps
+  // Build job text for Claude. Serper snippets go first: they're searched
+  // specifically for the job description, so they're curated and dense. The raw page
+  // body goes after — it's valuable for real server-rendered postings, but for
+  // JS-rendered career sites it's mostly nav/marketing boilerplate. Putting Serper
+  // first guarantees the relevant signal survives the slice(0, 10000) window in
+  // analyzeJobWithClaude rather than being crowded out by a large low-value shell.
   const pageBodyText = pageResult?.bodyText ?? ""
   const serperText = serperResults.map(r => `${r.title}\n${r.snippet}`).join("\n\n")
-  const jobText = [pageBodyText, serperText].filter(Boolean).join("\n\n")
+  const jobText = [serperText, pageBodyText].filter(Boolean).join("\n\n")
 
   // Claude-powered analysis (when key available), else heuristic fallback
   const [jobInsights, resumeProfile] = await Promise.all([

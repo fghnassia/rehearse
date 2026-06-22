@@ -98,6 +98,44 @@ Important:
 }
 
 // ---------------------------------------------------------------------------
+// Research synthesis
+// ---------------------------------------------------------------------------
+
+const synthesisSchema = z.object({
+  takeaways: z.array(z.string()).min(2).max(3),
+})
+
+export async function synthesizeResearch(
+  companyName: string,
+  roleTitle: string,
+  insights: string,
+  apiKey: string
+): Promise<string[]> {
+  if (!insights.trim()) return []
+  const client = getClient(apiKey)
+  const { object } = await generateObject({
+    model: client(MODEL),
+    schema: synthesisSchema,
+    prompt: `You are helping a product designer prepare for an interview at ${companyName} for the ${roleTitle} role.
+
+Here is what we found in public sources about their interview process and culture:
+${insights.slice(0, 3000)}
+
+Generate exactly 2-3 short, specific bullet points about what this research reveals that is DIRECTLY RELEVANT to preparing for this interview. Focus on:
+- What interviewers specifically care about or commonly ask
+- Cultural signals or values that come up repeatedly
+- A tension or challenge specific to this company that might surface in questions
+
+Rules:
+- Each bullet is 1-2 sentences maximum
+- Be specific to ${companyName}, not generic interview advice
+- Do not start with "The company" or repeat the company name in every bullet
+- Write in plain prose, not as interview tips`,
+  })
+  return object.takeaways
+}
+
+// ---------------------------------------------------------------------------
 // Answer evaluation
 // ---------------------------------------------------------------------------
 

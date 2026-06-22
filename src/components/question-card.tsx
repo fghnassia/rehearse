@@ -13,6 +13,27 @@ interface QuestionCardProps {
 export function QuestionCard({ questionNumber, qa }: QuestionCardProps) {
   const [showAnswer, setShowAnswer] = useState(false)
 
+  if (qa.status === "skipped") {
+    return (
+      <div className="pt-6 pb-2">
+        <p className="font-sans text-xs font-medium tracking-[0.2em] uppercase text-muted-foreground mb-3">
+          Question {questionNumber}
+        </p>
+        <p className="font-heading text-xl font-light leading-snug text-foreground mb-6">
+          {qa.questionText}
+        </p>
+        <div className="bg-muted/40 rounded px-4 py-3">
+          <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground mb-1.5">
+            Skipped
+          </p>
+          <p className="font-sans text-sm text-muted-foreground leading-relaxed">
+            You skipped this question, so there&apos;s nothing to score. Redo this stage to take it on.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="pt-6 pb-2">
       <p className="font-sans text-xs font-medium tracking-[0.2em] uppercase text-muted-foreground mb-3">
