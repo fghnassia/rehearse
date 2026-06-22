@@ -369,13 +369,6 @@ export default function SetupPage() {
             </RadioGroup>
           </div>
 
-          {/* Session notice */}
-          <Alert>
-            <AlertDescription className="font-sans text-xs text-muted-foreground leading-relaxed">
-              Once you begin the interview, the session runs as one continuous flow. Your report is only available in this session.
-            </AlertDescription>
-          </Alert>
-
           {/* Submit error */}
           {errors.submit && (
             <Alert variant="destructive">
