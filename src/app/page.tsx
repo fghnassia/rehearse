@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { getLocalProfile } from "@/lib/local-profile"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 interface LastSession {
   slug: string
@@ -109,6 +110,7 @@ export default function Home() {
         </p>
       </div>
 
+      <ThemeToggle />
     </main>
   )
 }

@@ -11,6 +11,7 @@ import { useSession } from "@/lib/session-context"
 import type { QAPair, ScoreLevel } from "@/lib/session-types"
 import { SavePrompt } from "@/components/save-prompt"
 import { appendScoreSnapshot } from "@/lib/local-profile"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 type ReportPhase = "generating" | "ready" | "error"
 type ExportMenu = "transcript" | "feedback" | null
@@ -669,6 +670,8 @@ export default function ReportPage() {
       <div className="px-8 py-4">
         <p className="text-xs text-muted-foreground font-sans">Rehearse · Feedback report</p>
       </div>
+
+      <ThemeToggle />
     </main>
   )
 }
