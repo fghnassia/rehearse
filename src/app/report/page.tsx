@@ -18,6 +18,8 @@ type ExportMenu = "transcript" | "feedback" | null
 const levelValue: Record<ScoreLevel, number> = { weak: 1, moderate: 2, strong: 3 }
 
 function qaScore(qa: QAPair): number | null {
+  // A skipped question counts as 0 toward the overall score — no credit for not answering.
+  if (qa.status === "skipped") return 0
   if (!qa.scores || qa.scores.length === 0) return null
   const sum = qa.scores.reduce((acc, s) => acc + levelValue[s.level], 0)
   return Math.round((sum / (qa.scores.length * 3)) * 10 * 10) / 10
@@ -108,6 +110,23 @@ function triggerDownload(filename: string, content: string, mime: string) {
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// Print an isolated HTML document (its own window) so the output is just this
+// content — e.g. a transcript PDF, not the whole report page that window.print() grabs.
+function printHtmlDocument(title: string, bodyHtml: string) {
+  const w = window.open("", "_blank")
+  if (!w) return
+  w.document.write(
+    `<html><head><meta charset="UTF-8"><title>${title}</title>` +
+    `<style>body{font-family:Arial,sans-serif;font-size:12pt;line-height:1.6;max-width:700px;margin:40px auto;padding:0 24px;color:#1a1a1a;}` +
+    `h1{font-size:20pt;font-weight:600;}h2{font-size:13pt;margin-top:22px;}p{margin:6px 0;}</style></head>` +
+    `<body>${bodyHtml}</body></html>`
+  )
+  w.document.close()
+  w.focus()
+  // Let the new window paint before invoking the print dialog.
+  setTimeout(() => w.print(), 300)
 }
 
 function mdToSimpleHtml(md: string): string {
@@ -233,6 +252,13 @@ export default function ReportPage() {
   const numericScore = overallNumericScore(evaluatedAnswers)
   const scorePercent = numericScore !== null ? (numericScore / 10) * 100 : 0
 
+  // Derive the displayed level from the numeric score so the badge (and the exported
+  // feedback) can't contradict the X/10 — skipped questions count as 0 and can pull the
+  // score well below the AI's holistic impression. Fall back to the AI level if no score.
+  const displayLevel: ScoreLevel = numericScore !== null
+    ? (numericScore >= 7 ? "strong" : numericScore >= 4 ? "moderate" : "weak")
+    : overallLevel
+
   const handleSelectQ = (idx: number) => {
     setSelectedQ(idx)
     setTimeout(() => {
@@ -246,7 +272,7 @@ export default function ReportPage() {
       session.context.companyName,
       session.context.roleTitle,
       session.setup.stage,
-      overallLevel,
+      displayLevel,
       overallSummary,
       numericScore,
       evaluatedAnswers
@@ -258,7 +284,7 @@ export default function ReportPage() {
     setOpenExport(null)
   }
 
-  const handleDownloadTranscript = (format: "md" | "docx") => {
+  const handleDownloadTranscript = (format: "md" | "docx" | "pdf") => {
     if (!session.context || !session.setup) return
     const md = buildTranscriptMD(
       session.context.companyName,
@@ -269,6 +295,8 @@ export default function ReportPage() {
     const slug = session.context.companyName.toLowerCase().replace(/\s+/g, "-")
     if (format === "md") {
       triggerDownload(`${slug}-transcript.md`, md, "text/markdown")
+    } else if (format === "pdf") {
+      printHtmlDocument(`${slug}-transcript`, mdToSimpleHtml(md))
     } else {
       const html = `<html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:12pt;line-height:1.6;max-width:700px;margin:40px auto;}</style></head><body>${mdToSimpleHtml(md)}</body></html>`
       triggerDownload(`${slug}-transcript.doc`, html, "application/vnd.ms-word")
@@ -287,7 +315,7 @@ export default function ReportPage() {
       session.context.companyName,
       session.context.roleTitle,
       session.setup.stage,
-      overallLevel,
+      displayLevel,
       overallSummary,
       numericScore,
       evaluatedAnswers
@@ -312,7 +340,7 @@ export default function ReportPage() {
     router.push("/setup")
   }
 
-  const overall = overallConfig[overallLevel]
+  const overall = overallConfig[displayLevel]
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -514,6 +542,12 @@ export default function ReportPage() {
                         className="w-full text-left px-4 py-2 font-sans text-xs text-foreground hover:bg-muted/50 transition-colors"
                       >
                         DOCX
+                      </button>
+                      <button
+                        onClick={() => handleDownloadTranscript("pdf")}
+                        className="w-full text-left px-4 py-2 font-sans text-xs text-foreground hover:bg-muted/50 transition-colors"
+                      >
+                        PDF
                       </button>
                     </div>
                   )}

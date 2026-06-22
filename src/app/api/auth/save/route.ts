@@ -52,13 +52,22 @@ export async function POST(req: NextRequest) {
   await setSession(session)
   await addSessionToToken(tokenId, slug)
 
-  await sendMagicLink({
-    to: email,
-    tokenId,
-    sessionSlug: slug,
-    companyName: context.companyName,
-    stage: setup.stage,
-  })
+  // The report is already saved at this point. The magic-link email is a bonus for
+  // cross-device recovery, so a Resend failure (e.g. an unverified domain rejecting the
+  // recipient) must not fail the save — surface it instead so the UI can adapt.
+  let emailSent = true
+  try {
+    await sendMagicLink({
+      to: email,
+      tokenId,
+      sessionSlug: slug,
+      companyName: context.companyName,
+      stage: setup.stage,
+    })
+  } catch (err) {
+    emailSent = false
+    console.error("[auth/save] email send failed:", err)
+  }
 
-  return NextResponse.json({ slug, tokenId })
+  return NextResponse.json({ slug, tokenId, emailSent })
 }

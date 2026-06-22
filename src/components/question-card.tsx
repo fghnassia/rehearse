@@ -22,14 +22,24 @@ export function QuestionCard({ questionNumber, qa }: QuestionCardProps) {
         <p className="font-heading text-xl font-light leading-snug text-foreground mb-6">
           {qa.questionText}
         </p>
-        <div className="bg-muted/40 rounded px-4 py-3">
+        <div className="bg-muted/40 rounded px-4 py-3 mb-3">
           <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground mb-1.5">
             Skipped
           </p>
           <p className="font-sans text-sm text-muted-foreground leading-relaxed">
-            You skipped this question, so there&apos;s nothing to score. Redo this stage to take it on.
+            {qa.sampleAnswer
+              ? "You skipped this one — so it counts as 0. Here's a strong answer to study before the real interview."
+              : "You skipped this question, so it counts as 0. Redo this stage to take it on."}
           </p>
         </div>
+        {qa.sampleAnswer && (
+          <div className="bg-[var(--state-positive)]/30 rounded px-4 py-3">
+            <p className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-[var(--state-positive-foreground)] mb-1.5">
+              Suggested answer
+            </p>
+            <p className="font-sans text-sm text-foreground leading-relaxed italic">{qa.sampleAnswer}</p>
+          </div>
+        )}
       </div>
     )
   }

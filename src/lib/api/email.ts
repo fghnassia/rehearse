@@ -1,5 +1,5 @@
 import { Resend } from "resend"
-import { getResendApiKey, getAppUrl } from "@/lib/config"
+import { getResendApiKey, getAppUrl, getResendFrom } from "@/lib/config"
 
 let _resend: Resend | null = null
 
@@ -26,7 +26,7 @@ export async function sendMagicLink({
   const reportUrl = `${appUrl}/r/${sessionSlug}`
 
   const { error } = await getResend().emails.send({
-    from: "Rehearse <onboarding@resend.dev>",
+    from: getResendFrom(),
     to,
     subject: `Your Rehearse report — ${companyName} ${stage.replace("-", " ")}`,
     html: `
@@ -87,7 +87,7 @@ export async function sendDebriefReminder({
   const debriefUrl = `${appUrl}/r/${sessionSlug}?debrief=1`
 
   const { error } = await getResend().emails.send({
-    from: "Rehearse <onboarding@resend.dev>",
+    from: getResendFrom(),
     to,
     subject: `How did the ${companyName} interview go?`,
     html: `

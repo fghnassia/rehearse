@@ -9,6 +9,8 @@ import type { SavedSession } from "@/lib/api/kv"
 const levelValue: Record<ScoreLevel, number> = { weak: 1, moderate: 2, strong: 3 }
 
 function qaScore(qa: QAPair): number | null {
+  // A skipped question counts as 0 toward the overall score — no credit for not answering.
+  if (qa.status === "skipped") return 0
   if (!qa.scores || qa.scores.length === 0) return null
   const sum = qa.scores.reduce((acc, s) => acc + levelValue[s.level], 0)
   return Math.round((sum / (qa.scores.length * 3)) * 10 * 10) / 10
@@ -86,13 +88,17 @@ function SavedReportContent() {
   const derivedLevel: ScoreLevel = numericScore !== null
     ? (numericScore >= 7 ? "strong" : numericScore >= 4 ? "moderate" : "weak")
     : overallLevel
-  const overall = overallConfig[overallLevel]
+  // Badge derives from the numeric score so it can't contradict the X/10 (skipped
+  // questions count as 0, which can pull the score below the AI's holistic level).
+  const overall = overallConfig[derivedLevel]
   const scorePercent = numericScore !== null ? Math.round((numericScore / 10) * 100) : 50
 
   // Compact (morning-of) view
   if (compact) {
     const compactOverall = overallConfig[derivedLevel]
     const weakQs = answers.filter(qa => {
+      // Skipped questions are the highest-priority focus area — surface them with the model answer.
+      if (qa.status === "skipped") return true
       if (!qa.scores || qa.scores.length === 0) return false
       const sum = qa.scores.reduce((acc, s) => acc + levelValue[s.level], 0)
       const score = (sum / (qa.scores.length * 3)) * 10
@@ -203,8 +209,9 @@ function SavedReportContent() {
           <p className="font-sans text-xs font-medium tracking-[0.2em] uppercase text-muted-foreground mb-4">Questions</p>
           <div className="grid grid-cols-3 gap-3">
             {answers.map((qa, i) => {
-              const level = qaLevel(qa)
-              const score = qaScore(qa)
+              const isSkipped = qa.status === "skipped"
+              const level = isSkipped ? null : qaLevel(qa)
+              const score = isSkipped ? null : qaScore(qa)
               const isSelected = selectedQ === i
               return (
                 <button
@@ -217,8 +224,14 @@ function SavedReportContent() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-sans text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">Q{i + 1}</span>
                     <div className="flex items-center gap-1.5">
-                      {level && <span className={`inline-block w-2 h-2 rounded-full ${levelDotColor[level]}`} />}
-                      {score !== null && <span className="font-sans text-xs text-muted-foreground">{score}</span>}
+                      {isSkipped ? (
+                        <span className="font-sans text-[10px] tracking-[0.08em] uppercase text-muted-foreground/60">Skipped</span>
+                      ) : (
+                        <>
+                          {level && <span className={`inline-block w-2 h-2 rounded-full ${levelDotColor[level]}`} />}
+                          {score !== null && <span className="font-sans text-xs text-muted-foreground">{score}</span>}
+                        </>
+                      )}
                     </div>
                   </div>
                   <p className="font-sans text-xs text-foreground leading-snug line-clamp-2">{qa.questionText}</p>

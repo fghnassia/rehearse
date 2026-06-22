@@ -136,6 +136,32 @@ Rules:
 }
 
 // ---------------------------------------------------------------------------
+// Sample answer for skipped questions (no scoring — just a model answer to study)
+// ---------------------------------------------------------------------------
+
+const sampleAnswerSchema = z.object({ sampleAnswer: z.string() })
+
+export async function generateSampleAnswer(
+  question: string,
+  stage: InterviewStage,
+  companyName: string,
+  roleTitle: string,
+  apiKey: string
+): Promise<string> {
+  const client = getClient(apiKey)
+  const { object } = await generateObject({
+    model: client(MODEL),
+    schema: sampleAnswerSchema,
+    prompt: `A product designer skipped this question while practising for a ${stage.replace("-", " ")} interview for ${roleTitle} at ${companyName}:
+
+"${question}"
+
+Write a strong model answer (3-5 sentences) they can study before the real interview. Make it specific and concrete — use the kind of structure, examples, and point of view a great candidate would bring. Write it in the first person as calibration, not a rigid script to memorise.`,
+  })
+  return object.sampleAnswer
+}
+
+// ---------------------------------------------------------------------------
 // Answer evaluation
 // ---------------------------------------------------------------------------
 

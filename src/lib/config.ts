@@ -51,6 +51,14 @@ export function getResendApiKey(): string {
   return key
 }
 
+// The "from" address for transactional email. Defaults to Resend's shared test
+// sender, which ONLY delivers to the Resend account owner. To send to any
+// recipient, verify a domain at resend.com/domains and set RESEND_FROM, e.g.
+// RESEND_FROM="Rehearse <noreply@yourdomain.com>".
+export function getResendFrom(): string {
+  return readEnv("RESEND_FROM") ?? "Rehearse <onboarding@resend.dev>"
+}
+
 export function getAppUrl(): string {
   return readEnv("NEXT_PUBLIC_APP_URL") ?? 'http://localhost:3000'
 }

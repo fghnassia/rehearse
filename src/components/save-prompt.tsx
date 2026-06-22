@@ -17,6 +17,7 @@ export function SavePrompt({ setup, context, simulation, report, onSaved }: Save
   const [email, setEmail] = useState("")
   const [state, setState] = useState<SaveState>("idle")
   const [error, setError] = useState("")
+  const [emailSent, setEmailSent] = useState(true)
 
   const handleSave = async () => {
     if (!email.trim() || !email.includes("@")) return
@@ -30,11 +31,12 @@ export function SavePrompt({ setup, context, simulation, report, onSaved }: Save
         body: JSON.stringify({ email: email.trim(), setup, context, simulation, report }),
       })
       if (!res.ok) throw new Error("Save failed")
-      const { tokenId, slug } = await res.json()
+      const { tokenId, slug, emailSent: sent } = await res.json()
 
       // Store token locally so this device is already "logged in"
       localStorage.setItem("rehearse_token", tokenId)
 
+      setEmailSent(sent !== false)
       setState("done")
       onSaved?.(tokenId, slug)
     } catch {
@@ -50,7 +52,9 @@ export function SavePrompt({ setup, context, simulation, report, onSaved }: Save
           Report saved
         </p>
         <p className="font-sans text-sm text-muted-foreground">
-          Check your email — your report link is on its way. You can close this tab.
+          {emailSent
+            ? "Check your email — your report link is on its way. You can close this tab."
+            : "Your report is saved and will reload on this device. We couldn't email the link this time — bookmark this page to revisit it."}
         </p>
       </div>
     )
