@@ -10,6 +10,7 @@ import { PipelineIndicator } from "@/components/pipeline-indicator"
 import { PersonaCard } from "@/components/persona-card"
 import { VoiceInput } from "@/components/voice-input"
 import { useSession } from "@/lib/session-context"
+import { buildPriorSessionContext } from "@/lib/local-profile"
 import type { SimulationData, QAPair } from "@/lib/session-types"
 
 type SimPhase = "loading" | "ready" | "interview" | "evaluating" | "transitioning" | "skipping" | "complete" | "error"
@@ -50,10 +51,20 @@ export default function SimulationPage() {
       return
     }
 
+    // Read prior sessions for this company from localStorage (client-side only)
+    // and pass them as optional context so questions target weak areas and avoid
+    // repeating prior topics. Null on the first session for a company.
+    const priorContext = buildPriorSessionContext(session.context.companyName)
+
     fetch("/api/generate-questions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ setup: session.setup, context: session.context, research: session.research }),
+      body: JSON.stringify({
+        setup: session.setup,
+        context: session.context,
+        research: session.research,
+        ...(priorContext ? { priorContext } : {}),
+      }),
     })
       .then(r => r.ok ? r.json() : r.json().then(d => Promise.reject(d.error ?? "Failed")))
       .then((data) => {

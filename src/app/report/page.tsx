@@ -240,6 +240,7 @@ export default function ReportPage() {
             date: new Date().toISOString(),
             overallScore: overallScoreValue ?? 0,
             criteriaScores,
+            questions: session.simulation?.questions ?? [],
           })
         } catch {
           // Non-fatal: local profile persistence is best-effort

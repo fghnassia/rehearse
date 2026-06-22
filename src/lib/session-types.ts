@@ -58,6 +58,20 @@ export interface ScoreSnapshot {
     communication: number
     aiFluency: number
   }
+  // Questions asked in this session — persisted so a later session for the same
+  // company can avoid repeating topics (cross-session question awareness).
+  questions?: string[]
+}
+
+// Built client-side from prior ScoreSnapshots for the same company, then passed
+// to the stateless generate-questions API so Claude can target weak areas and
+// avoid repeating prior topics. Never read from storage server-side.
+export interface PriorSessionContext {
+  company: string
+  sessionCount: number
+  weakestCriteria: string[]   // top 2 lowest-avg criterion names
+  coveredTopics: string[]     // prior question texts to avoid repeating, max 8
+  lastStage: string           // most recent stage completed for this company
 }
 
 export interface LocalProfileData {
