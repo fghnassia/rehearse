@@ -154,6 +154,7 @@ export default function ReportPage() {
   const [selectedQ, setSelectedQ] = useState(0)
   const [openExport, setOpenExport] = useState<ExportMenu>(null)
   const [copied, setCopied] = useState(false)
+  const [savedSlug, setSavedSlug] = useState<string | null>(null)
   const hasFetched = useRef(false)
   const detailRef = useRef<HTMLDivElement>(null)
 
@@ -439,6 +440,7 @@ export default function ReportPage() {
                   context={session.context}
                   simulation={session.simulation}
                   report={session.report}
+                  onSaved={(_tokenId, slug) => setSavedSlug(slug)}
                 />
               </div>
             )}
@@ -639,10 +641,23 @@ export default function ReportPage() {
               </a>
             </div>
 
-            {/* Session notice */}
-            <p className="font-sans text-xs text-muted-foreground/60 leading-relaxed">
-              This report lives only in this session — it disappears when you close the tab. Export or copy before you leave.
-            </p>
+            {/* Session notice — resolves with the save prompt above rather than contradicting it */}
+            {savedSlug ? (
+              <p className="font-sans text-xs text-muted-foreground/60 leading-relaxed">
+                Saved. You can reach this report any time from your{" "}
+                <a href={`/r/${savedSlug}`} className="underline underline-offset-2 hover:text-foreground transition-colors">
+                  permanent link
+                </a>{" "}
+                or your{" "}
+                <a href="/profile" className="underline underline-offset-2 hover:text-foreground transition-colors">
+                  profile
+                </a>.
+              </p>
+            ) : (
+              <p className="font-sans text-xs text-muted-foreground/60 leading-relaxed">
+                This report isn&apos;t saved yet — it&apos;ll disappear when you close the tab. Save it above, or export a copy before you leave.
+              </p>
+            )}
           </>
         )}
 
