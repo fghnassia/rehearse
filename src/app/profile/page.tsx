@@ -23,23 +23,47 @@ const stageLabel: Record<StageKey, string> = {
   portfolio_review: 'Portfolio',
 }
 
-function groupSnapshotsByCompany(snapshots: ScoreSnapshot[]) {
-  const map = new Map<string, {
-    company: string
-    lastActive: string
-    stages: Record<StageKey, { score: number; prevScore: number | null; date: string } | null>
-  }>()
+type StageCell = { score: number; prevScore: number | null; date: string } | null
+
+interface RoleGroup {
+  role: string
+  lastActive: string
+  sessionCount: number
+  stages: Record<StageKey, StageCell>
+}
+
+interface CompanyGroup {
+  company: string
+  lastActive: string
+  roles: RoleGroup[]
+}
+
+const ROLE_FALLBACK = "Role not recorded"
+
+// Group snapshots by company, then by role within each company — so the same
+// company appears once with each distinct role they've practised for as an
+// expandable track. Delta is computed per company+role+stage.
+function groupSnapshotsByCompany(snapshots: ScoreSnapshot[]): CompanyGroup[] {
+  const companyMap = new Map<string, { name: string; roles: Map<string, RoleGroup> }>()
 
   for (const snap of snapshots) {
-    const key = snap.company.toLowerCase().trim()
-    if (!map.has(key)) {
-      map.set(key, {
-        company: snap.company,
+    const companyKey = snap.company.toLowerCase().trim()
+    const roleKey = (snap.role ?? ROLE_FALLBACK).toLowerCase().trim()
+
+    if (!companyMap.has(companyKey)) companyMap.set(companyKey, { name: snap.company, roles: new Map() })
+    const roleMap = companyMap.get(companyKey)!.roles
+
+    if (!roleMap.has(roleKey)) {
+      roleMap.set(roleKey, {
+        role: snap.role ?? ROLE_FALLBACK,
         lastActive: snap.date,
+        sessionCount: 0,
         stages: { recruiter: null, hiring_manager: null, portfolio_review: null },
       })
     }
-    const group = map.get(key)!
+    const group = roleMap.get(roleKey)!
+    group.sessionCount++
+
     const existing = group.stages[snap.stage]
     if (!existing || new Date(snap.date) > new Date(existing.date)) {
       group.stages[snap.stage] = { score: snap.overallScore, prevScore: null, date: snap.date }
@@ -49,22 +73,38 @@ function groupSnapshotsByCompany(snapshots: ScoreSnapshot[]) {
     }
   }
 
-  // Compute prev score (delta) per company+stage
-  for (const group of map.values()) {
-    for (const stageKey of stageOrder) {
-      const current = group.stages[stageKey]
-      if (!current) continue
-      const companyKey = group.company.toLowerCase().trim()
-      const history = snapshots
-        .filter(s => s.company.toLowerCase().trim() === companyKey && s.stage === stageKey)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      if (history.length >= 2) {
-        current.prevScore = history[history.length - 2].overallScore
+  // Compute prev score (delta) per company+role+stage
+  for (const [companyKey, { roles: roleMap }] of companyMap) {
+    for (const [roleKey, group] of roleMap) {
+      for (const stageKey of stageOrder) {
+        const current = group.stages[stageKey]
+        if (!current) continue
+        const history = snapshots
+          .filter(s =>
+            s.company.toLowerCase().trim() === companyKey &&
+            (s.role ?? ROLE_FALLBACK).toLowerCase().trim() === roleKey &&
+            s.stage === stageKey
+          )
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        if (history.length >= 2) {
+          current.prevScore = history[history.length - 2].overallScore
+        }
       }
     }
   }
 
-  return Array.from(map.values()).sort(
+  const companies: CompanyGroup[] = Array.from(companyMap.values()).map(({ name, roles: roleMap }) => {
+    const roles = Array.from(roleMap.values()).sort(
+      (a, b) => new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime()
+    )
+    return {
+      company: name,
+      lastActive: roles[0].lastActive,
+      roles,
+    }
+  })
+
+  return companies.sort(
     (a, b) => new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime()
   )
 }
@@ -123,6 +163,10 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<LocalProfileData | null>(null)
   const [mounted, setMounted] = useState(false)
   const [tier3Open, setTier3Open] = useState(false)
+  const [expandedRoles, setExpandedRoles] = useState<Record<string, boolean>>({})
+
+  const toggleRole = (key: string) =>
+    setExpandedRoles(prev => ({ ...prev, [key]: !prev[key] }))
 
   useEffect(() => {
     setProfile(getLocalProfile())
@@ -232,6 +276,7 @@ export default function ProfilePage() {
             <div className="flex flex-col gap-6">
               {groups.map(group => (
                 <div key={group.company} className="border border-border rounded overflow-hidden">
+                  {/* Company header */}
                   <div className="px-5 py-4 border-b border-border/60 flex items-baseline justify-between">
                     <p className="font-sans text-sm font-medium text-foreground">{group.company}</p>
                     <p className="font-sans text-xs text-muted-foreground/60">
@@ -239,39 +284,70 @@ export default function ProfilePage() {
                     </p>
                   </div>
 
-                  {stageOrder.map((stage, i) => {
-                    const s = group.stages[stage]
-                    const isLast = i === stageOrder.length - 1
-
-                    if (!s) {
-                      return (
-                        <div key={stage} className={`px-5 py-3 flex items-center justify-between ${!isLast ? "border-b border-border/40" : ""}`}>
-                          <div className="flex items-center gap-3">
-                            <span className="font-sans text-xs text-muted-foreground/40 w-20">{stageLabel[stage]}</span>
-                            <span className="font-sans text-xs text-muted-foreground/30">not started</span>
-                          </div>
-                          <a href="/setup" className="font-sans text-xs text-muted-foreground/40 hover:text-muted-foreground transition-colors">
-                            Start →
-                          </a>
-                        </div>
-                      )
-                    }
-
-                    const delta = s.prevScore !== null
-                      ? Math.round((s.score - s.prevScore) * 10) / 10
-                      : null
+                  {/* Roles — each an expandable track */}
+                  {group.roles.map((roleGroup, ri) => {
+                    const roleKey = `${group.company}|${roleGroup.role}`
+                    const singleRole = group.roles.length === 1
+                    const expanded = expandedRoles[roleKey] ?? singleRole
+                    const isLastRole = ri === group.roles.length - 1
 
                     return (
-                      <div key={stage} className={`px-5 py-3 flex items-center justify-between ${!isLast ? "border-b border-border/40" : ""}`}>
-                        <div className="flex items-center gap-3">
-                          <span className="font-sans text-xs text-muted-foreground w-20 shrink-0">{stageLabel[stage]}</span>
-                          <span className="font-sans text-sm text-foreground">{s.score}</span>
-                          {delta !== null && (
-                            <span className={`font-sans text-xs ${delta >= 0 ? "text-[var(--state-positive-foreground)]" : "text-[var(--state-negative-foreground)]"}`}>
-                              {delta >= 0 ? `+${delta}` : delta}
-                            </span>
-                          )}
-                        </div>
+                      <div key={roleKey} className={!isLastRole ? "border-b border-border/60" : ""}>
+                        {/* Role row — toggle */}
+                        <button
+                          onClick={() => toggleRole(roleKey)}
+                          className="w-full px-5 py-3 flex items-center justify-between text-left hover:bg-muted/10 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-sans text-xs text-muted-foreground/50 w-3 shrink-0">{expanded ? "▾" : "▸"}</span>
+                            <span className="font-sans text-sm text-foreground truncate">{roleGroup.role}</span>
+                          </div>
+                          <span className="font-sans text-xs text-muted-foreground/60 shrink-0 ml-3">
+                            {roleGroup.sessionCount} session{roleGroup.sessionCount !== 1 ? "s" : ""}
+                          </span>
+                        </button>
+
+                        {/* Stage rows — indented under the role */}
+                        {expanded && (
+                          <div className="pb-1">
+                            {stageOrder.map((stage, i) => {
+                              const s = roleGroup.stages[stage]
+                              const isLast = i === stageOrder.length - 1
+
+                              if (!s) {
+                                return (
+                                  <div key={stage} className={`pl-10 pr-5 py-2.5 flex items-center justify-between ${!isLast ? "border-b border-border/30" : ""}`}>
+                                    <div className="flex items-center gap-3">
+                                      <span className="font-sans text-xs text-muted-foreground/40 w-20">{stageLabel[stage]}</span>
+                                      <span className="font-sans text-xs text-muted-foreground/30">not started</span>
+                                    </div>
+                                    <a href="/setup" className="font-sans text-xs text-muted-foreground/40 hover:text-muted-foreground transition-colors">
+                                      Start →
+                                    </a>
+                                  </div>
+                                )
+                              }
+
+                              const delta = s.prevScore !== null
+                                ? Math.round((s.score - s.prevScore) * 10) / 10
+                                : null
+
+                              return (
+                                <div key={stage} className={`pl-10 pr-5 py-2.5 flex items-center justify-between ${!isLast ? "border-b border-border/30" : ""}`}>
+                                  <div className="flex items-center gap-3">
+                                    <span className="font-sans text-xs text-muted-foreground w-20 shrink-0">{stageLabel[stage]}</span>
+                                    <span className="font-sans text-sm text-foreground">{s.score}</span>
+                                    {delta !== null && (
+                                      <span className={`font-sans text-xs ${delta >= 0 ? "text-[var(--state-positive-foreground)]" : "text-[var(--state-negative-foreground)]"}`}>
+                                        {delta >= 0 ? `+${delta}` : delta}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -344,7 +420,7 @@ export default function ProfilePage() {
                           <span className="font-sans text-sm text-foreground">{entry.score}</span>
                         </div>
                         <span className="font-sans text-xs text-muted-foreground/60">
-                          {new Date(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          {new Date(entry.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                         </span>
                       </div>
                     ))}

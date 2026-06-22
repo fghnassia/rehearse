@@ -47,6 +47,7 @@ export interface CompanyResearchSummary {
 export interface ScoreSnapshot {
   sessionId: string
   company: string
+  role?: string
   stage: 'recruiter' | 'hiring_manager' | 'portfolio_review'
   date: string
   overallScore: number

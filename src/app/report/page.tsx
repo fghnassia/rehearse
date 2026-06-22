@@ -235,6 +235,7 @@ export default function ReportPage() {
           appendScoreSnapshot({
             sessionId: crypto.randomUUID(),
             company: session.context!.companyName,
+            role: session.context!.roleTitle,
             stage: stageMap[session.setup!.stage] ?? "recruiter",
             date: new Date().toISOString(),
             overallScore: overallScoreValue ?? 0,
