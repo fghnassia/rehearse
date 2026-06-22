@@ -632,6 +632,13 @@ export default function ReportPage() {
               </div>
             </div>
 
+            {/* Quiet nav to the cross-session profile (built from local snapshots) */}
+            <div className="mb-6">
+              <a href="/profile" className="font-sans text-xs text-muted-foreground hover:text-foreground transition-colors">
+                View your profile →
+              </a>
+            </div>
+
             {/* Session notice */}
             <p className="font-sans text-xs text-muted-foreground/60 leading-relaxed">
               This report lives only in this session — it disappears when you close the tab. Export or copy before you leave.

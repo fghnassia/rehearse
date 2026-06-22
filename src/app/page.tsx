@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { getLocalProfile } from "@/lib/local-profile"
 
 interface LastSession {
   slug: string
@@ -11,8 +12,13 @@ interface LastSession {
 
 export default function Home() {
   const [lastSession, setLastSession] = useState<LastSession | null>(null)
+  const [hasLocalProfile, setHasLocalProfile] = useState(false)
 
   useEffect(() => {
+    // The candidate profile is built from local snapshots and needs no email save —
+    // surface it whenever at least one session has been scored on this device.
+    if (getLocalProfile().scoreSnapshots.length > 0) setHasLocalProfile(true)
+
     const tokenId = localStorage.getItem("rehearse_token")
     if (!tokenId) return
     fetch(`/api/auth/verify?t=${tokenId}`)
@@ -49,10 +55,16 @@ export default function Home() {
             <Link href="/sessions" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
               All sessions
             </Link>
-            <Link href="/profile" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-              Profile
-            </Link>
+            {hasLocalProfile && (
+              <Link href="/profile" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Profile
+              </Link>
+            )}
           </div>
+        ) : hasLocalProfile ? (
+          <Link href="/profile" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            Profile →
+          </Link>
         ) : (
           <span className="text-xs text-muted-foreground">
             Interview prep for product designers
