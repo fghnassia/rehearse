@@ -49,6 +49,9 @@ export default function Home() {
             <Link href="/sessions" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
               All sessions
             </Link>
+            <Link href="/profile" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              Profile
+            </Link>
           </div>
         ) : (
           <span className="text-xs text-muted-foreground">

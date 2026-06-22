@@ -126,3 +126,45 @@ export interface SessionState {
   simulation?: SimulationData
   report?: ReportData
 }
+
+export interface CriterionTrend {
+  direction: 'up' | 'down' | 'flat'
+  confidence: 'low' | 'medium' | 'high'
+  sampleSize: number
+  latestScore: number
+  delta: number | null
+}
+
+export interface StageVariance {
+  recruiterScreen: number | null
+  hiringManager: number | null
+  portfolioReview: number | null
+  flag: string | null
+}
+
+export interface VerdictHistoryEntry {
+  verdict: string
+  score: number
+  date: string
+  sessionId: string
+}
+
+export interface ProfileSynthesis {
+  trendsByCriterion: {
+    structure: CriterionTrend
+    specificity: CriterionTrend
+    relevance: CriterionTrend
+    communication: CriterionTrend
+    aiFluency: CriterionTrend
+  }
+  stageVariance: StageVariance
+  overallTrend: CriterionTrend
+  topStrength: string | null
+  topWeakness: string | null
+  readinessVerdict: {
+    current: string
+    history: VerdictHistoryEntry[]
+  }
+  sessionCount: number
+  companiesCount: number
+}

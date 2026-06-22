@@ -42,7 +42,7 @@ const stagePersonas: Record<InterviewStage, { name: string; role: string; behavi
 // ---------------------------------------------------------------------------
 
 const questionsSchema = z.object({
-  questions: z.array(z.string()).min(15).max(15),
+  questions: z.array(z.string()).min(3).max(25),
 })
 
 export async function generateQuestions(

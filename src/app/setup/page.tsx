@@ -12,7 +12,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { PipelineIndicator } from "@/components/pipeline-indicator"
 import { WarningCircle } from "@phosphor-icons/react"
 import { useSession } from "@/lib/session-context"
-import type { InterviewStage } from "@/lib/session-types"
+import type { InterviewStage, InferredIdentity } from "@/lib/session-types"
+import { getLocalProfile } from "@/lib/local-profile"
 
 const stages: { id: InterviewStage; label: string; description: string }[] = [
   {
@@ -46,6 +47,8 @@ export default function SetupPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [existingResumeText, setExistingResumeText] = useState<string | null>(null)
   const [existingResumeFileName, setExistingResumeFileName] = useState<string | null>(null)
+  const [identityOnFile, setIdentityOnFile] = useState<InferredIdentity | null>(null)
+  const [showUpload, setShowUpload] = useState(false)
   const [portfolioUrl, setPortfolioUrl] = useState("")
   const [jobPostingUrl, setJobPostingUrl] = useState("")
   const [stage, setStage] = useState<InterviewStage>("recruiter")
@@ -55,14 +58,30 @@ export default function SetupPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Hydrate form from session when returning to this page
+  // Hydrate form from session when returning to this page, or recognize identity from local profile
   useEffect(() => {
-    if (!hydrated || !session.setup) return
-    setExistingResumeText(session.setup.resumeText)
-    setExistingResumeFileName(session.setup.resumeFileName ?? null)
-    setPortfolioUrl(session.setup.portfolioUrl ?? "")
-    setJobPostingUrl(session.setup.jobPostingUrl ?? "")
-    setStage(session.setup.stage ?? "recruiter")
+    if (!hydrated) return
+
+    if (session.setup) {
+      // Active session takes full precedence
+      setExistingResumeText(session.setup.resumeText)
+      setExistingResumeFileName(session.setup.resumeFileName ?? null)
+      setPortfolioUrl(session.setup.portfolioUrl ?? "")
+      setJobPostingUrl(session.setup.jobPostingUrl ?? "")
+      setStage(session.setup.stage ?? "recruiter")
+      return
+    }
+
+    // Identity recognition: returning user with a saved token + inferred identity
+    const tokenId = localStorage.getItem("rehearse_token")
+    if (tokenId) {
+      const profile = getLocalProfile()
+      if (profile.inferredIdentity) {
+        setIdentityOnFile(profile.inferredIdentity)
+        // Use experience summary as lightweight resume context for question generation
+        setExistingResumeText(profile.inferredIdentity.experienceSummary)
+      }
+    }
   }, [hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileSelect = useCallback((file: File) => {
@@ -183,52 +202,79 @@ export default function SetupPage() {
                 if (file) handleFileSelect(file)
               }}
             />
-            <Card
-              className={`border-dashed cursor-pointer transition-colors duration-200 ${
-                isDragging
-                  ? "border-primary bg-primary/5"
-                  : errors.resume
-                  ? "border-destructive"
-                  : resumeFile
-                  ? "border-primary"
-                  : "border-border hover:border-primary"
-              }`}
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-            >
-              <CardContent className="flex flex-col items-start gap-2 py-8 px-6">
-                {resumeFile ? (
-                  <>
-                    <p className="font-sans text-sm font-medium text-foreground">{resumeFile.name}</p>
-                    <p className="font-sans text-xs text-muted-foreground">
-                      {(resumeFile.size / 1024).toFixed(0)} KB · Click to replace
-                    </p>
-                  </>
-                ) : existingResumeText ? (
-                  <>
-                    <p className="font-sans text-sm font-medium text-foreground">
-                      {existingResumeFileName ?? "Resume loaded"}
-                    </p>
-                    <p className="font-sans text-xs text-muted-foreground">Click to replace</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-sans text-sm font-medium text-foreground">Upload PDF</p>
-                    <p className="font-sans text-xs text-muted-foreground">Drag and drop or click to browse</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 font-sans text-xs tracking-[0.1em] uppercase"
-                      onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
-                    >
-                      Choose file
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+
+            {/* Identity recognition collapsed state */}
+            {identityOnFile && !showUpload && !resumeFile ? (
+              <div className="flex items-center justify-between border border-border rounded px-4 py-4">
+                <div>
+                  <p className="font-sans text-sm text-foreground">
+                    Resume on file — {identityOnFile.role}, {identityOnFile.seniority}
+                  </p>
+                  <p className="font-sans text-xs text-muted-foreground mt-0.5">
+                    From your last session
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUpload(true)
+                    setIdentityOnFile(null)
+                    setExistingResumeText(null)
+                  }}
+                  className="font-sans text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 shrink-0 ml-4"
+                >
+                  Replace
+                </button>
+              </div>
+            ) : (
+              <Card
+                className={`border-dashed cursor-pointer transition-colors duration-200 ${
+                  isDragging
+                    ? "border-primary bg-primary/5"
+                    : errors.resume
+                    ? "border-destructive"
+                    : resumeFile
+                    ? "border-primary"
+                    : "border-border hover:border-primary"
+                }`}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+              >
+                <CardContent className="flex flex-col items-start gap-2 py-8 px-6">
+                  {resumeFile ? (
+                    <>
+                      <p className="font-sans text-sm font-medium text-foreground">{resumeFile.name}</p>
+                      <p className="font-sans text-xs text-muted-foreground">
+                        {(resumeFile.size / 1024).toFixed(0)} KB · Click to replace
+                      </p>
+                    </>
+                  ) : existingResumeText ? (
+                    <>
+                      <p className="font-sans text-sm font-medium text-foreground">
+                        {existingResumeFileName ?? "Resume loaded"}
+                      </p>
+                      <p className="font-sans text-xs text-muted-foreground">Click to replace</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-sans text-sm font-medium text-foreground">Upload PDF</p>
+                      <p className="font-sans text-xs text-muted-foreground">Drag and drop or click to browse</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 font-sans text-xs tracking-[0.1em] uppercase"
+                        onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
+                      >
+                        Choose file
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {errors.resume && (
               <p className="font-sans text-xs text-destructive">{errors.resume}</p>
             )}
