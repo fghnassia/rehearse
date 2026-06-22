@@ -130,7 +130,10 @@ export function computeProfileSynthesis(snapshots: ScoreSnapshot[]): ProfileSynt
     topWeakness = criterionAvgs[criterionAvgs.length - 1].name
   }
 
-  // Verdict history — derived purely from snapshots, most recent first
+  // Verdict history is derived from snapshots, which is correct for now: snapshots
+  // are append-only (appendScoreSnapshot only ever pushes), so the derived history
+  // can only grow. Revisit — pass history in and append to it — if snapshots ever
+  // become mutable (e.g. session deletion). Append-only guarantee covered by tests.
   const history = [...sorted].reverse().map(s => ({
     verdict: scoreToVerdict(s.overallScore),
     score: s.overallScore,
