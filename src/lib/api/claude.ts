@@ -1,7 +1,7 @@
 import { generateObject } from "ai"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { z } from "zod"
-import type { SetupData, ContextData, ResearchData, InterviewStage, ScoreLevel } from "../session-types"
+import type { SetupData, ContextData, ResearchData, InterviewStage, ScoreLevel, PriorSessionContext } from "../session-types"
 
 const MODEL = "claude-sonnet-4-5"
 
@@ -45,11 +45,47 @@ const questionsSchema = z.object({
   questions: z.array(z.string()).min(3).max(25),
 })
 
+// A question is "clean" if every character is Latin text (Basic Latin + Latin-1
+// Supplement, U+0000–U+00FF) or common typographic punctuation (General
+// Punctuation block, U+2000–U+206F — em/en dashes, curly quotes, ellipses).
+// Anything else (CJK, Cyrillic, Arabic, emoji, …) marks the question contaminated.
+// Iterating with for…of walks code points, so astral characters are handled.
+function hasForeignCharacters(question: string): boolean {
+  for (const ch of question) {
+    const cp = ch.codePointAt(0)!
+    const allowed = cp <= 0x00ff || (cp >= 0x2000 && cp <= 0x206f)
+    if (!allowed) return true
+  }
+  return false
+}
+
+// Builds the optional cross-session context block. Empty string when there's no
+// valid prior context, so first-session prompts are byte-for-byte unchanged.
+function buildPriorContextBlock(prior: PriorSessionContext | undefined, companyName: string): string {
+  if (!prior || prior.sessionCount < 1) return ""
+
+  const weak = prior.weakestCriteria.length > 0
+    ? `\n- Weakest criteria from their prior sessions — weight more questions toward probing these areas: ${prior.weakestCriteria.join(", ")}.`
+    : ""
+
+  const topics = prior.coveredTopics.length > 0
+    ? `\n- Questions/topics already covered in prior sessions — do NOT repeat these; go deeper or cover new ground instead:\n${prior.coveredTopics.map(t => `  • ${t}`).join("\n")}`
+    : ""
+
+  return `
+
+CROSS-SESSION CONTEXT — this candidate has already practised for ${companyName}:
+- This is session ${prior.sessionCount + 1} for this company; their most recent completed round was the ${prior.lastStage}.${weak}${topics}
+
+Because they have prior history with this company, this round must build on it rather than repeat surface-level questions. Go deeper on their weak areas and avoid re-asking topics they have already faced.`
+}
+
 export async function generateQuestions(
   setup: SetupData,
   context: ContextData,
   research: ResearchData,
-  apiKey: string
+  apiKey: string,
+  priorContext?: PriorSessionContext
 ): Promise<{ personaName: string; personaRole: string; behaviorNote: string; questions: string[] }> {
   const persona = stagePersonas[setup.stage]
   const client = getClient(apiKey)
@@ -67,10 +103,9 @@ export async function generateQuestions(
     "portfolio-review": "Generate 15 portfolio review questions covering: a specific project walkthrough, a decision they'd make differently, handling a stakeholder conflict or constraint, how AI shaped their design process, the impact of their work, how they chose what to include in their portfolio, a project that didn't go as planned, how they present work to executives vs. peers, how they handle critique on presented work, a project they're most proud of and why, how they balance craft with speed, a time they had to kill a design they loved, what problem they'd most like to solve next, how their design thinking has evolved, and one question specific to the company or role from the job description. Questions should prompt deep reflection.",
   }
 
-  const { object } = await generateObject({
-    model: client(MODEL),
-    schema: questionsSchema,
-    prompt: `You are ${persona.name}, ${persona.role} at ${context.companyName}, conducting a ${setup.stage.replace("-", " ")} interview.
+  const priorContextBlock = buildPriorContextBlock(priorContext, context.companyName)
+
+  const prompt = `You are ${persona.name}, ${persona.role} at ${context.companyName}, conducting a ${setup.stage.replace("-", " ")} interview.
 
 Candidate resume excerpt:
 ${setup.resumeText.slice(0, 2000)}
@@ -79,21 +114,40 @@ ${jobDescription}
 
 ${researchContext}
 
-${stageInstructions[setup.stage]}
+${stageInstructions[setup.stage]}${priorContextBlock}
 
 Important:
 - Make questions specific to ${context.companyName} and the ${context.roleTitle} role where possible
 - Reference the candidate's background when relevant
 - Do not ask generic questions that could be for any company
 - Do not number the questions
-- Each question should be 1-2 sentences maximum`,
-  })
+- Each question should be 1-2 sentences maximum`
+
+  const generate = async (): Promise<string[]> => {
+    const { object } = await generateObject({ model: client(MODEL), schema: questionsSchema, prompt })
+    return object.questions
+  }
+
+  // Claude occasionally injects a foreign-script token mid-question (e.g. a CJK
+  // word). Reject the whole set if any question is contaminated and regenerate
+  // once with the same prompt. If the retry is still contaminated, log a warning
+  // and proceed — never block the user, and never loop more than once.
+  let questions = await generate()
+  if (questions.some(hasForeignCharacters)) {
+    questions = await generate()
+    if (questions.some(hasForeignCharacters)) {
+      console.warn(
+        `[generateQuestions] non-Latin characters persisted after one retry for ${context.companyName}; proceeding anyway.`,
+        questions.filter(hasForeignCharacters),
+      )
+    }
+  }
 
   return {
     personaName: persona.name,
     personaRole: `${persona.role} at ${context.companyName}`,
     behaviorNote: persona.behaviorNote,
-    questions: object.questions,
+    questions,
   }
 }
 
